@@ -1,16 +1,21 @@
-// Command-line entry point for TraceCraft.
+// ...[與前面一樣的 import與read_all_rs_files略]...
 
-use clap::Parser;
-use tracecraft::application::AnalyzeUsecase;
-use tracecraft::infrastructure::{SynAstParser, SimpleCallGraphBuilder, DotExporter};
+use toml::Value as TomlValue;
 
-/// TraceCraft - Rust static analysis tool for multi-crate workspaces.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Input source file path (currently accepts .rs only)
-    #[arg(short, long)]
-    input: String,
+    /// Input source files (can specify multiple)
+    #[arg(short, long, required = false)]
+    input: Vec<String>,
+
+    /// Input source folders (can specify multiple)
+    #[arg(short = 'd', long, required = false)]
+    folder: Vec<String>,
+
+    /// Analyze all crates in a Cargo workspace (auto-find all .rs)
+    #[arg(long, required = false)]
+    workspace: Option<String>,
 
     /// Output file path
     #[arg(short, long)]
@@ -21,11 +26,55 @@ struct Cli {
     format: String,
 }
 
+fn collect_rs_from_workspace(cargo_toml_path: &str) -> Vec<String> {
+    let toml = std::fs::read_to_string(cargo_toml_path).unwrap();
+    let value = toml.parse::<TomlValue>().unwrap();
+    let mut all_rs = vec![];
+    if let Some(workspace) = value.get("workspace") {
+        if let Some(members) = workspace.get("members").and_then(|m| m.as_array()) {
+            for member in members {
+                if let Some(path) = member.as_str() {
+                    // 只收 src/**/*.rs
+                    let src_dir = format!("{}/src", path.trim_end_matches('/'));
+                    let mut content = read_all_rs_files(&src_dir);
+                    if !content.is_empty() {
+                        all_rs.push(content);
+                    }
+                }
+            }
+        }
+    }
+    all_rs
+}
+
+// ... read_all_rs_files 與 main() function ...
 fn main() {
     let cli = Cli::parse();
-    // Read the input file
-    let src_code = std::fs::read_to_string(&cli.input)
-        .unwrap_or_else(|_| "// Fallback: file not found or unreadable.".to_string());
+    let mut src_code = String::new();
+
+    // 1. input files
+    for input_file in &cli.input {
+        if let Ok(code) = fs::read_to_string(input_file) {
+            src_code.push_str(&code);
+            src_code.push('\n');
+        }
+    }
+
+    // 2. folders
+    for folder in &cli.folder {
+        src_code.push_str(&read_all_rs_files(folder));
+    }
+
+    // 3. workspace
+    if let Some(cargo_toml) = cli.workspace {
+        for code in collect_rs_from_workspace(&cargo_toml) {
+            src_code.push_str(&code);
+        }
+    }
+
+    if src_code.trim().is_empty() {
+        panic!("Please provide at least one --input <file> or --folder <dir> or --workspace <Cargo.toml>");
+    }
 
     let usecase = AnalyzeUsecase {
         parser: &SynAstParser,
@@ -43,4 +92,3 @@ fn main() {
         Err(e) => eprintln!("Error: {:?}", e),
     }
 }
-
