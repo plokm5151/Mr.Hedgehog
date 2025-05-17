@@ -46,7 +46,7 @@ impl CallGraphBuilder for SimpleCallGraphBuilder {
                 let id = child.name.clone().unwrap_or("unknown".to_string());
                 ids.push(id.clone());
                 let mut callees = vec![];
-                // Demo: 假如 main 與 foo 都存在，就讓 main 呼叫 foo
+                // demo: main -> foo if both exist
                 if id == "main" && ids.contains(&"foo".to_string()) {
                     callees.push("foo".to_string());
                 }
@@ -60,23 +60,27 @@ impl CallGraphBuilder for SimpleCallGraphBuilder {
 pub struct DotExporter;
 impl OutputExporter for DotExporter {
     fn export(&self, data: &str, path: &str) -> std::io::Result<()> {
-        // 極簡 parser：動態根據 debug print 產生 DOT
+        // 更健壯的解析：只對 id, callees 明確為名稱時產生 edge
         let mut nodes = vec![];
         let mut edges = vec![];
+        let mut last_id = None;
         for line in data.lines() {
-            // id: "main",
             if let Some(idx) = line.find("id: \"") {
-                let id = line[idx + 5..].split('"').next().unwrap();
-                nodes.push(id.to_string());
+                let id = line[idx + 5..].split('"').next().unwrap().to_string();
+                nodes.push(id.clone());
+                last_id = Some(id);
             }
-            // callees: ["foo"]
             if let Some(idx) = line.find("callees: [") {
-                let rest = &line[idx + 10..];
-                let callees: Vec<&str> = rest.split('"').filter(|s| !s.is_empty() && *s != ", " && *s != "]").collect();
-                if !nodes.is_empty() && !callees.is_empty() {
-                    let from = nodes.last().unwrap();
-                    for to in callees {
-                        edges.push((from.clone(), to.to_string()));
+                // 只抓引號內真的像 function 名稱的字串
+                for m in line[idx..].match_indices("\"") {
+                    let start = m.0 + 1;
+                    if let Some(end) = line[start..].find('"') {
+                        let callee = &line[start..start + end];
+                        if !callee.is_empty() && callee.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                            if let Some(ref from) = last_id {
+                                edges.push((from.clone(), callee.to_string()));
+                            }
+                        }
                     }
                 }
             }
