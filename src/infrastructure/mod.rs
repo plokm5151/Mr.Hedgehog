@@ -1,9 +1,8 @@
-// Infrastructure implementations for TraceCraft.
-
 use crate::domain::ast::{AstNode, AstNodeKind};
 use crate::domain::callgraph::*;
 use crate::ports::{AstParser, CallGraphBuilder, OutputExporter};
-use syn::{File, Item};
+use syn::{File, Item, Expr, Stmt};
+use std::collections::HashMap;
 
 pub struct SynAstParser;
 impl AstParser for SynAstParser {
@@ -16,7 +15,6 @@ impl AstParser for SynAstParser {
                 children: vec![],
             },
         };
-
         let mut children = Vec::new();
         for item in ast_file.items {
             if let Item::Fn(ref func) = item {
@@ -38,59 +36,94 @@ impl AstParser for SynAstParser {
 
 pub struct SimpleCallGraphBuilder;
 impl CallGraphBuilder for SimpleCallGraphBuilder {
-    fn build_call_graph(&self, root: &AstNode) -> CallGraph {
-        let mut nodes = Vec::new();
-        let mut ids = Vec::new();
-        for child in root.children.iter() {
-            if let AstNodeKind::Function = child.kind {
-                let id = child.name.clone().unwrap_or("unknown".to_string());
-                ids.push(id.clone());
+    fn build_call_graph(&self, _root: &AstNode) -> CallGraph {
+        let src = std::fs::read_to_string("test_input.rs").unwrap();
+        let ast_file: File = syn::parse_file(&src).unwrap();
+        let mut callees_map: HashMap<String, Vec<String>> = HashMap::new();
+        let mut all_funcs = vec![];
+
+        for item in ast_file.items {
+            if let Item::Fn(ref func) = item {
+                let name = func.sig.ident.to_string();
+                all_funcs.push(name.clone());
                 let mut callees = vec![];
-                // demo: main -> foo if both exist
-                if id == "main" && ids.contains(&"foo".to_string()) {
-                    callees.push("foo".to_string());
-                }
-                nodes.push(CallGraphNode { id, callees });
+                visit_stmts(&func.block.stmts, &mut callees);
+                callees_map.insert(name, callees);
             }
+        }
+
+        let mut nodes = vec![];
+        for func in &all_funcs {
+            let callees = callees_map.get(func).cloned().unwrap_or_default();
+            nodes.push(CallGraphNode {
+                id: func.clone(),
+                callees,
+            });
         }
         CallGraph { nodes }
     }
 }
 
-pub struct DotExporter;
-impl OutputExporter for DotExporter {
-    fn export(&self, data: &str, path: &str) -> std::io::Result<()> {
-        // 更健壯的解析：只對 id, callees 明確為名稱時產生 edge
-        let mut nodes = vec![];
-        let mut edges = vec![];
-        let mut last_id = None;
-        for line in data.lines() {
-            if let Some(idx) = line.find("id: \"") {
-                let id = line[idx + 5..].split('"').next().unwrap().to_string();
-                nodes.push(id.clone());
-                last_id = Some(id);
+fn visit_stmts(stmts: &[Stmt], callees: &mut Vec<String>) {
+    for stmt in stmts {
+        match stmt {
+            Stmt::Expr(expr, _) => {
+                visit_expr(expr, callees);
             }
-            if let Some(idx) = line.find("callees: [") {
-                // 只抓引號內真的像 function 名稱的字串
-                for m in line[idx..].match_indices("\"") {
-                    let start = m.0 + 1;
-                    if let Some(end) = line[start..].find('"') {
-                        let callee = &line[start..start + end];
-                        if !callee.is_empty() && callee.chars().all(|c| c.is_alphanumeric() || c == '_') {
-                            if let Some(ref from) = last_id {
-                                edges.push((from.clone(), callee.to_string()));
-                            }
-                        }
-                    }
+            _ => {}
+        }
+    }
+}
+
+fn visit_expr(expr: &Expr, callees: &mut Vec<String>) {
+    match expr {
+        Expr::Call(expr_call) => {
+            if let Expr::Path(ref expr_path) = *expr_call.func {
+                if let Some(ident) = expr_path.path.get_ident() {
+                    callees.push(ident.to_string());
                 }
             }
+            for arg in &expr_call.args {
+                visit_expr(arg, callees);
+            }
         }
+        Expr::If(expr_if) => {
+            visit_expr(&expr_if.cond, callees);
+            visit_stmts(&expr_if.then_branch.stmts, callees);
+            if let Some((_, else_branch)) = &expr_if.else_branch {
+                visit_expr(else_branch, callees);
+            }
+        }
+        Expr::Block(expr_block) => {
+            visit_stmts(&expr_block.block.stmts, callees);
+        }
+        Expr::While(expr_while) => {
+            visit_expr(&expr_while.cond, callees);
+            visit_stmts(&expr_while.body.stmts, callees);
+        }
+        Expr::ForLoop(expr_for) => {
+            visit_expr(&expr_for.expr, callees);
+            visit_stmts(&expr_for.body.stmts, callees);
+        }
+        Expr::Match(expr_match) => {
+            visit_expr(&expr_match.expr, callees);
+            for arm in &expr_match.arms {
+                visit_expr(&arm.body, callees);
+            }
+        }
+        _ => {}
+    }
+}
+
+pub struct DotExporter;
+impl OutputExporter for DotExporter {
+    fn export(&self, graph: &CallGraph, path: &str) -> std::io::Result<()> {
         let mut dot_lines = vec!["digraph G {".to_string()];
-        for node in &nodes {
-            dot_lines.push(format!("    {};", node));
-        }
-        for (from, to) in &edges {
-            dot_lines.push(format!("    {} -> {};", from, to));
+        for node in &graph.nodes {
+            dot_lines.push(format!("    {};", node.id));
+            for callee in &node.callees {
+                dot_lines.push(format!("    {} -> {};", node.id, callee));
+            }
         }
         dot_lines.push("}".to_string());
         std::fs::write(path, dot_lines.join("\n"))

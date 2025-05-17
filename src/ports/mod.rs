@@ -1,16 +1,17 @@
-// Interface definitions (traits) for TraceCraft core logic.
+use crate::domain::ast::AstNode;
+use crate::domain::callgraph::CallGraph;
 
+// AST Parser: Parse source code string to AST node tree
 pub trait AstParser {
-    /// Parse source code and return an AST root node.
-    fn parse(&self, src: &str) -> crate::domain::ast::AstNode;
+    fn parse(&self, src: &str) -> AstNode;
 }
 
+// CallGraph Builder: Build call graph from AST node
 pub trait CallGraphBuilder {
-    /// Build a call graph from the root AST node.
-    fn build_call_graph(&self, root: &crate::domain::ast::AstNode) -> crate::domain::callgraph::CallGraph;
+    fn build_call_graph(&self, root: &AstNode) -> CallGraph;
 }
 
+// OutputExporter: Export call graph to disk in specific format
 pub trait OutputExporter {
-    /// Export the call graph or AST in a specified format.
-    fn export(&self, data: &str, path: &str) -> std::io::Result<()>;
+    fn export(&self, graph: &CallGraph, path: &str) -> std::io::Result<()>;
 }
