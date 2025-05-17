@@ -36,9 +36,8 @@ impl AstParser for SynAstParser {
 
 pub struct SimpleCallGraphBuilder;
 impl CallGraphBuilder for SimpleCallGraphBuilder {
-    fn build_call_graph(&self, _root: &AstNode) -> CallGraph {
-        let src = std::fs::read_to_string("test_input.rs").unwrap();
-        let ast_file: File = syn::parse_file(&src).unwrap();
+    fn build_call_graph(&self, src: &str) -> CallGraph {
+        let ast_file: File = syn::parse_file(src).unwrap();
         let mut callees_map: HashMap<String, Vec<String>> = HashMap::new();
         let mut all_funcs = vec![];
 
@@ -48,18 +47,15 @@ impl CallGraphBuilder for SimpleCallGraphBuilder {
                 all_funcs.push(name.clone());
                 let mut callees = vec![];
                 visit_stmts(&func.block.stmts, &mut callees);
+                println!("[Debug] fn: {}, callees: {:?}", name, callees); // ← debug
                 callees_map.insert(name, callees);
             }
         }
 
-        let mut nodes = vec![];
-        for func in &all_funcs {
-            let callees = callees_map.get(func).cloned().unwrap_or_default();
-            nodes.push(CallGraphNode {
-                id: func.clone(),
-                callees,
-            });
-        }
+        let nodes = all_funcs.iter().map(|f| CallGraphNode {
+            id: f.clone(),
+            callees: callees_map.remove(f).unwrap_or_default(),
+        }).collect();
         CallGraph { nodes }
     }
 }
