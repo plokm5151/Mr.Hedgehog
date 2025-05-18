@@ -1,6 +1,6 @@
 use crate::ports::{CallGraphBuilder, OutputExporter};
 use crate::domain::callgraph::{CallGraph, CallGraphNode};
-use syn::{File, Item, Expr, Stmt, spanned::Spanned};
+use syn::{File, Item, Stmt, Expr};
 use std::collections::HashMap;
 use std::fs;
 
@@ -168,6 +168,7 @@ fn visit_stmts(stmts: &Vec<Stmt>, callees: &mut Vec<String>) {
         }
     }
 }
+
 fn visit_expr(expr: &Expr, callees: &mut Vec<String>) {
     match expr {
         Expr::Call(expr_call) => {
