@@ -1,3 +1,9 @@
 /target
 result.dot
 test_input.rs
+_bak/
+*.dot
+test_project/
+test_ws/
+test_generic.rs
+*.sed
