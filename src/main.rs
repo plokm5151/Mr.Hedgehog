@@ -32,6 +32,14 @@ struct Cli {
     /// 反向查詢（查詢所有能呼叫到此 function 的所有路徑，例 Type::func@crate）
     #[arg(long)]
     reverse: Option<String>,
+
+    /// 展開 main 到所有葉節點的完整呼叫路徑
+    #[arg(long)]
+    expand_paths: bool,
+
+    /// 分支 event 摘要模式（if/match 分支遇到相同 event 只記一次，不重複展開）
+    #[arg(long)]
+    branch_summary: bool,
 }
 
 fn collect_rs(dir:&str, crate_name:&str)->Vec<(String,String,String)> {
@@ -141,28 +149,62 @@ fn main() {
         return;
     }
 
-    // ── 3. trace from mainà ──────────────────
+    // ── 3. trace from main，分支摘要模式 ──────────────────
     println!("\n==== [DEBUG nodes] ====");
     for n in &callgraph.nodes{println!("{} -> {:?}",n.id,n.callees);}
     println!("========================");
 
-    let mut vis=HashSet::new(); let mut trace=Vec::new();
-    if !entry.is_empty() {
-        fn dfs(id:&str,map:&HashMap<String,&tracecraft::domain::callgraph::CallGraphNode>,
-               vis:&mut HashSet<String>,trace:&mut Vec<String>) {
-            if !vis.insert(id.into()){return;}
-            trace.push(id.into());
-            if let Some(n)=map.get(id){for c in &n.callees{dfs(c,map,vis,trace);}}
+    let mut all_paths: Vec<Vec<String>> = Vec::new();
+    if !entry.is_empty() && cli.expand_paths {
+        fn dfs_expand(
+            node_id: &str,
+            map: &HashMap<String,&tracecraft::domain::callgraph::CallGraphNode>,
+            path: &mut Vec<String>,
+            all_paths: &mut Vec<Vec<String>>,
+            depth: usize,
+            branch_summary: bool,
+            branch_event_set: &mut HashSet<String>
+        ) {
+            if depth > 128 { return; }
+            if let Some(n) = map.get(node_id) {
+                if n.callees.is_empty() {
+                    all_paths.push(path.clone());
+                } else {
+                    for callee in &n.callees {
+                        // 判斷是否為分支 event
+                        let is_branch_event = callee.starts_with("if(") || callee.starts_with("match(") || callee.starts_with("match_arm");
+                        if branch_summary && is_branch_event {
+                            if branch_event_set.contains(callee) { continue; }
+                            branch_event_set.insert(callee.clone());
+                        }
+                        if path.contains(callee) { continue; }
+                        path.push(callee.clone());
+                        dfs_expand(callee, map, path, all_paths, depth+1, branch_summary, branch_event_set);
+                        path.pop();
+                        if branch_summary && is_branch_event {
+                            branch_event_set.remove(callee);
+                        }
+                    }
+                }
+            }
         }
-        dfs(&entry,&map,&mut vis,&mut trace);
-    }
+        let mut path = vec![entry.clone()];
+        let mut branch_event_set = HashSet::new();
+        dfs_expand(&entry, &map, &mut path, &mut all_paths, 0, cli.branch_summary, &mut branch_event_set);
 
-    println!("\n=== Call-flow ===");
-    for (i,id) in trace.iter().enumerate(){println!("{}. {}",i+1,id);}
-    println!("=================\n");
+        println!("\n=== All call paths from entry (main) ===");
+        for (i, p) in all_paths.iter().enumerate() {
+            println!("Path {}:", i+1);
+            for seg in p {
+                println!("  {}", seg);
+            }
+            println!();
+        }
+    }
 
     // ── 4. export dot ────────────────────────
     let exporter=DotExporter{};
     exporter.export(&callgraph,&cli.output).unwrap();
     println!("Graph saved to {}",cli.output);
 }
+

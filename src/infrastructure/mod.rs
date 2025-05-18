@@ -1,134 +1,156 @@
+use syn::{Item, Stmt, Expr, ImplItem, Type, Pat};
 use std::collections::HashMap;
 use crate::domain::callgraph::{CallGraph, CallGraphNode};
-use crate::ports::{CallGraphBuilder, OutputExporter};
-use syn::{Item, Stmt, Expr, ImplItem, Type, Pat};
 
-type SymbolTable = HashMap<String, String>;
-struct ImplInfo { type_name: String, methods: Vec<String> }
+pub struct SimpleCallGraphBuilder;
+
+impl crate::ports::CallGraphBuilder for SimpleCallGraphBuilder {
+    fn build_call_graph(&self, files: &[(String, String, String)]) -> CallGraph {
+        let mut impls = Vec::new();
+        let mut func_defs = Vec::new();
+
+        for (_crate_name, file, code) in files {
+            let ast_file = syn::parse_file(code).expect("Parse error");
+            // 收集 impl
+            for item in &ast_file.items {
+                if let Item::Impl(imp) = item {
+                    if let Type::Path(tp) = &*imp.self_ty {
+                        let type_name = tp.path.segments.last().unwrap().ident.to_string();
+                        for ii in &imp.items {
+                            if let ImplItem::Fn(f) = ii {
+                                let method_name = f.sig.ident.to_string();
+                                impls.push((type_name.clone(), method_name));
+                            }
+                        }
+                    }
+                }
+            }
+            // 收集 fn
+            for item in &ast_file.items {
+                if let Item::Fn(func) = item {
+                    let name = func.sig.ident.to_string();
+                    let mut callees = vec![];
+                    visit_stmts(&func.block.stmts, &mut callees, &impls);
+                    let line = func.sig.ident.span().start().line;
+                    let label = Some(format!("{}:{}", file, line));
+                    func_defs.push((name, "main".to_string(), "".to_string(), callees, label));
+                }
+            }
+        }
+
+        // 封裝成 CallGraph
+        let nodes = func_defs.into_iter()
+            .map(|(name, crate_name, _path, callees, label)| {
+                CallGraphNode {
+                    id: format!("{}@{}", name, crate_name),
+                    callees,
+                    label,
+                }
+            })
+            .collect();
+        CallGraph { nodes }
+    }
+}
+
+// 遍歷語法樹、分析函式呼叫
+fn visit_stmts(stmts: &Vec<Stmt>, callees: &mut Vec<String>, impls: &Vec<(String, String)>) {
+    for stmt in stmts {
+        match stmt {
+            Stmt::Expr(expr, _) => visit_expr(expr, callees, impls),
+            _ => {}
+        }
+    }
+}
+
+fn visit_expr(expr: &Expr, callees: &mut Vec<String>, impls: &Vec<(String, String)>) {
+    match expr {
+        Expr::Call(expr_call) => {
+            if let Expr::Path(ref expr_path) = *expr_call.func {
+                let segments: Vec<_> = expr_path.path.segments.iter().map(|s| s.ident.to_string()).collect();
+                if !segments.is_empty() {
+                    callees.push(segments.join("::"));
+                }
+            }
+            for arg in &expr_call.args {
+                visit_expr(arg, callees, impls);
+            }
+        }
+        Expr::MethodCall(expr_method) => {
+            let method_name = expr_method.method.to_string();
+            // 嘗試靜態取得 receiver 型別
+            let receiver_type = match &*expr_method.receiver {
+                Expr::Path(expr_path) => expr_path.path.segments.last().map(|s| s.ident.to_string()),
+                _ => None,
+            };
+            if let Some(rt) = &receiver_type {
+                let mut found = false;
+                for (type_name, method) in impls {
+                    if type_name == rt && method == &method_name {
+                        let callee_id = format!("{}::{}@main", type_name, method_name);
+                        callees.push(callee_id);
+                        found = true;
+                        break;
+                    }
+                }
+                if !found {
+                    callees.push(format!("{}::{}@main", rt, method_name));
+                }
+            } else {
+                callees.push(format!("{}@main", method_name));
+            }
+            for arg in &expr_method.args {
+                visit_expr(arg, callees, impls);
+            }
+            visit_expr(&expr_method.receiver, callees, impls);
+        }
+        Expr::Block(expr_block) => visit_stmts(&expr_block.block.stmts, callees, impls),
+        Expr::If(expr_if) => {
+            callees.push("if(...)".to_string());
+            visit_expr(&expr_if.cond, callees, impls);
+            visit_block(&expr_if.then_branch, callees, impls);
+            if let Some((_, else_branch)) = &expr_if.else_branch {
+                match &**else_branch {
+                    Expr::Block(block) => visit_block(&block.block, callees, impls),
+                    Expr::If(else_if) => {
+                        callees.push("else if(...)".to_string());
+                        visit_expr(&else_if.cond, callees, impls);
+                        visit_block(&else_if.then_branch, callees, impls);
+                    }
+                    other => visit_expr(other, callees, impls),
+                }
+            }
+        }
+        Expr::Match(expr_match) => {
+            callees.push("match(...)".to_string());
+            visit_expr(&expr_match.expr, callees, impls);
+            for (i, arm) in expr_match.arms.iter().enumerate() {
+                let label = format!("match_arm_{}", i);
+                callees.push(label.clone());
+                visit_expr(&arm.body, callees, impls);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn visit_block(block: &syn::Block, callees: &mut Vec<String>, impls: &Vec<(String, String)>) {
+    visit_stmts(&block.stmts, callees, impls);
+}
 
 pub struct DotExporter;
-impl OutputExporter for DotExporter {
+
+impl crate::ports::OutputExporter for DotExporter {
     fn export(&self, cg: &CallGraph, path: &str) -> std::io::Result<()> {
-        let mut out = vec!["digraph G {".into()];
+        let mut out = vec![];
+        out.push("digraph G {".to_string());
         for n in &cg.nodes {
             let lbl = n.label.clone().unwrap_or_else(|| n.id.clone());
-            out.push(format!("    \"{}\" [label=\"{}\"];", n.id, lbl.replace('"', "\\\"")));
+            out.push(format!("    \"{}\" [label=\"{}\"];", n.id, lbl.replace('\"', "\\\"")));
             for c in &n.callees {
                 out.push(format!("    \"{}\" -> \"{}\";", n.id, c));
             }
         }
-        out.push("}".into());
+        out.push("}".to_string());
         std::fs::write(path, out.join("\n"))
-    }
-}
-
-pub struct SimpleCallGraphBuilder;
-impl CallGraphBuilder for SimpleCallGraphBuilder {
-    fn build_call_graph(&self, files: &[(String,String,String)]) -> CallGraph {
-        let mut impls = Vec::<ImplInfo>::new();
-        for (_,_,code) in files {
-            if let Ok(ast) = syn::parse_file(code) {
-                for it in ast.items {
-                    if let Item::Impl(imp) = it {
-                        if let Type::Path(tp) = &*imp.self_ty {
-                            let ty = tp.path.segments.last().unwrap().ident.to_string();
-                            let mut meth = Vec::new();
-                            for ii in &imp.items { if let ImplItem::Fn(f)=ii { meth.push(f.sig.ident.to_string()); } }
-                            impls.push(ImplInfo{type_name:ty,methods:meth});
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut defs = Vec::new();
-        for (cr, path, code) in files {
-            if let Ok(ast)=syn::parse_file(code){
-                for it in ast.items {
-                    match it {
-                        Item::Fn(f) => {
-                            let mut callees=Vec::new();
-                            visit_stmts(&f.block.stmts,&mut callees,&impls,&mut HashMap::new());
-                            let lbl=Some(format!("{}:{}",path,f.sig.ident.span().start().line));
-                            defs.push((f.sig.ident.to_string(),cr.clone(),path.clone(),callees,lbl));
-                        }
-                        Item::Impl(imp) => if let Type::Path(tp)=&*imp.self_ty {
-                            let ty=tp.path.segments.last().unwrap().ident.to_string();
-                            for ii in imp.items {
-                                if let ImplItem::Fn(m)=ii{
-                                    let mut callees=Vec::new();
-                                    visit_stmts(&m.block.stmts,&mut callees,&impls,&mut HashMap::new());
-                                    let lbl=Some(format!("{}:{}",path,m.sig.ident.span().start().line));
-                                    defs.push((format!("{}::{}",ty,m.sig.ident),cr.clone(),path.clone(),callees,lbl));
-                                }
-                            }
-                        }
-                        _=>{}
-                    }
-                }
-            }
-        }
-
-        let mut map=HashMap::new();
-        for (n,c,p,_,_) in &defs { map.insert(format!("{}@{}",n,c),(n.clone(),c.clone(),p.clone())); }
-        let nodes=defs.into_iter().map(|(n,c,_,cal,lbl)|{
-            let id=format!("{}@{}",n,&c);
-            let edges=cal.into_iter().map(|t|format!("{}@{}",t,&c)).collect();
-            CallGraphNode{id,callees:edges,label:lbl}
-        }).collect();
-        CallGraph{nodes}
-    }
-}
-
-fn visit_stmts(st:&[Stmt],cal:&mut Vec<String>,impls:&[ImplInfo],sym:&mut SymbolTable){
-    for s in st{
-        match s{
-            Stmt::Local(l)=>{
-                if let Pat::Ident(pi)=&l.pat{
-                    if let Some(init)=&l.init{
-                        if let Expr::Path(p)=&*init.expr{
-                            sym.insert(pi.ident.to_string(),p.path.segments.last().unwrap().ident.to_string());
-                        }
-                    }
-                }
-            }
-            Stmt::Expr(e,_)=>visit_expr(e,cal,impls,sym),
-            _=>{}
-        }
-    }
-}
-
-fn visit_expr(e:&Expr,cal:&mut Vec<String>,impls:&[ImplInfo],sym:&SymbolTable){
-    match e{
-        Expr::Call(c)=>{
-            if let Expr::Path(p)=&*c.func{
-                cal.push(p.path.segments.iter().map(|s|s.ident.to_string()).collect::<Vec<_>>().join("::"));
-            }
-            for a in &c.args{visit_expr(a,cal,impls,sym);}
-        }
-        Expr::MethodCall(mc)=>{
-            let m=mc.method.to_string();
-            let recv_ty=if let Expr::Path(p)=&*mc.receiver{
-                sym.get(&p.path.segments.last().unwrap().ident.to_string()).cloned()
-            }else{None};
-            if let Some(rt)=recv_ty{
-                if impls.iter().any(|i|i.type_name==rt && i.methods.contains(&m)){
-                    cal.push(format!("{}::{}",rt,m));
-                }else{cal.push(format!("{}::{}",rt,m));}
-            }else{cal.push(m.clone());}
-            for a in &mc.args{visit_expr(a,cal,impls,sym);}
-            visit_expr(&mc.receiver,cal,impls,sym);
-        }
-        Expr::Block(b)=>visit_stmts(&b.block.stmts,cal,impls,&mut sym.clone()),
-        Expr::If(i)=>{
-            visit_expr(&i.cond,cal,impls,sym);
-            visit_stmts(&i.then_branch.stmts,cal,impls,&mut sym.clone());
-            if let Some((_,e2))=&i.else_branch{visit_expr(e2,cal,impls,sym);}
-        }
-        Expr::Match(m)=>{
-            visit_expr(&m.expr,cal,impls,sym);
-            for a in &m.arms{visit_expr(&a.body,cal,impls,sym);}
-        }
-        _=>{}
     }
 }
