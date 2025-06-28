@@ -1,6 +1,6 @@
-use syn::{Item, Stmt, Expr, ImplItem, Type, Pat};
-use std::collections::HashMap;
 use crate::domain::callgraph::{CallGraph, CallGraphNode};
+use std::collections::HashMap;
+use syn::{Expr, ImplItem, Item, Pat, Stmt, Type};
 
 pub struct SimpleCallGraphBuilder;
 
@@ -9,7 +9,7 @@ impl crate::ports::CallGraphBuilder for SimpleCallGraphBuilder {
         let mut impls = Vec::new();
         let mut func_defs = Vec::new();
 
-        for (_crate_name, file, code) in files {
+        for (crate_name, file, code) in files {
             let ast_file = syn::parse_file(code).expect("Parse error");
             // 收集 impl
             for item in &ast_file.items {
@@ -33,19 +33,18 @@ impl crate::ports::CallGraphBuilder for SimpleCallGraphBuilder {
                     visit_stmts(&func.block.stmts, &mut callees, &impls);
                     let line = func.sig.ident.span().start().line;
                     let label = Some(format!("{}:{}", file, line));
-                    func_defs.push((name, "main".to_string(), "".to_string(), callees, label));
+                    func_defs.push((name, crate_name.clone(), file.clone(), callees, label));
                 }
             }
         }
 
         // 封裝成 CallGraph
-        let nodes = func_defs.into_iter()
-            .map(|(name, crate_name, _path, callees, label)| {
-                CallGraphNode {
-                    id: format!("{}@{}", name, crate_name),
-                    callees,
-                    label,
-                }
+        let nodes = func_defs
+            .into_iter()
+            .map(|(name, crate_name, _path, callees, label)| CallGraphNode {
+                id: format!("{}@{}", name, crate_name),
+                callees,
+                label,
             })
             .collect();
         CallGraph { nodes }
@@ -66,7 +65,12 @@ fn visit_expr(expr: &Expr, callees: &mut Vec<String>, impls: &Vec<(String, Strin
     match expr {
         Expr::Call(expr_call) => {
             if let Expr::Path(ref expr_path) = *expr_call.func {
-                let segments: Vec<_> = expr_path.path.segments.iter().map(|s| s.ident.to_string()).collect();
+                let segments: Vec<_> = expr_path
+                    .path
+                    .segments
+                    .iter()
+                    .map(|s| s.ident.to_string())
+                    .collect();
                 if !segments.is_empty() {
                     callees.push(segments.join("::"));
                 }
@@ -79,7 +83,9 @@ fn visit_expr(expr: &Expr, callees: &mut Vec<String>, impls: &Vec<(String, Strin
             let method_name = expr_method.method.to_string();
             // 嘗試靜態取得 receiver 型別
             let receiver_type = match &*expr_method.receiver {
-                Expr::Path(expr_path) => expr_path.path.segments.last().map(|s| s.ident.to_string()),
+                Expr::Path(expr_path) => {
+                    expr_path.path.segments.last().map(|s| s.ident.to_string())
+                }
                 _ => None,
             };
             if let Some(rt) = &receiver_type {
@@ -145,7 +151,11 @@ impl crate::ports::OutputExporter for DotExporter {
         out.push("digraph G {".to_string());
         for n in &cg.nodes {
             let lbl = n.label.clone().unwrap_or_else(|| n.id.clone());
-            out.push(format!("    \"{}\" [label=\"{}\"];", n.id, lbl.replace('\"', "\\\"")));
+            out.push(format!(
+                "    \"{}\" [label=\"{}\"];",
+                n.id,
+                lbl.replace('\"', "\\\"")
+            ));
             for c in &n.callees {
                 out.push(format!("    \"{}\" -> \"{}\";", n.id, c));
             }
