@@ -1,9 +1,9 @@
 use clap::Parser;
 use std::fs;
-use std::path::Path;
 use std::collections::{HashMap, HashSet};
 
 use tracecraft::infrastructure::{SimpleCallGraphBuilder, DotExporter};
+use tracecraft::infrastructure::project_loader::ProjectLoader;
 use tracecraft::ports::{CallGraphBuilder, OutputExporter};
 
 #[derive(Parser, Debug)]
@@ -46,38 +46,6 @@ struct Cli {
     debug: bool,
 }
 
-fn collect_rs(dir:&str, crate_name:&str)->Vec<(String,String,String)> {
-    fn walk(p:&Path, c:&str, out:&mut Vec<(String,String,String)>) {
-        if p.ends_with("target")||p.ends_with(".git"){return;}
-        if let Ok(rd)=fs::read_dir(p) {
-            for e in rd.flatten() {
-                let path=e.path();
-                if path.is_dir(){walk(&path,c,out);}
-                else if path.extension().map(|x|x=="rs").unwrap_or(false) {
-                    if let Ok(src)=fs::read_to_string(&path) {
-                        out.push((c.to_string(),path.display().to_string(),src));
-                    }
-                }
-            }
-        }
-    }
-    let mut v=Vec::new(); walk(Path::new(dir),crate_name,&mut v); v
-}
-
-fn parse_ws(ws:&str)->Vec<(String,String)> {
-    let root=Path::new(ws).parent().unwrap();
-    let toml=fs::read_to_string(ws).expect("read Cargo.toml");
-    let v:toml::Value=toml::from_str(&toml).expect("toml");
-    v["workspace"]["members"].as_array().expect("members")
-      .iter()
-      .map(|m|{
-          let s=m.as_str().unwrap();
-          let crate_dir=root.join(s);
-          let crate_name=s.split('/').last().unwrap();
-          (crate_name.to_string(),crate_dir.join("src").display().to_string())
-      }).collect()
-}
-
 fn main() {
     let cli=Cli::parse();
 
@@ -87,20 +55,24 @@ fn main() {
 
     let mut files=Vec::<(String,String,String)>::new();
 
-    // single files
-    for f in &cli.input {
-        if let Ok(src)=fs::read_to_string(f) {
-            files.push(("main".into(),f.clone(),src));
+    // workspace (primary method)
+    if let Some(ws) = &cli.workspace {
+        match ProjectLoader::load_workspace(ws) {
+            Ok(loaded_files) => {
+                println!("Loaded {} files from workspace", loaded_files.len());
+                files.extend(loaded_files);
+            },
+            Err(e) => panic!("Failed to load workspace: {:?}", e),
+        }
+    } else {
+        // Legacy/Fallback handling could go here. 
+        // For now, if no workspace is provided but input is, we panic (based on user request to focus on workspace)
+        // Or we could implement a quick fallback if needed.
+        if !cli.input.is_empty() || !cli.folder.is_empty() {
+             panic!("Legacy input/folder mode is momentarily disabled during refactor. Please use --workspace.");
         }
     }
-    // folders
-    for d in &cli.folder { files.extend(collect_rs(d,"main")); }
-    // workspace
-    if let Some(ws)=&cli.workspace {
-        for (c,src_dir) in parse_ws(ws) {
-            files.extend(collect_rs(&src_dir,&c));
-        }
-    }
+
     if files.is_empty(){panic!("No input provided");}
 
     // ── 2. **唯一一次** 建圖 ─────────────────
