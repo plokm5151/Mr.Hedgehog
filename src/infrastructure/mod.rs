@@ -8,64 +8,133 @@ pub mod expander;
 
 pub struct SimpleCallGraphBuilder;
 
+impl SimpleCallGraphBuilder {
+    pub fn build_from_asts(&self, index: &SymbolIndex, asts: &[(String, String, syn::File)]) -> CallGraph {
+        let mut func_defs = Vec::new();
+
+        // Step 1: Collect all potential nodes (functions and methods)
+        for (crate_name, file, ast) in asts {
+            for item in &ast.items {
+                 if let Item::Fn(func) = item {
+                     // Register node
+                     let name = func.sig.ident.to_string();
+                     // Use unique ID from index logic: crate::func
+                     let id = format!("{}::{}", crate_name, name);
+                     let label = Some(format!("{}::{}", crate_name, name)); // Label is Option<String>
+                     
+                     func_defs.push(CallGraphNode {
+                         id: id.clone(),
+                         callees: Vec::new(), // Initialize with empty callees
+                         label,
+                     });
+                 }
+                 // Handle Impl blocks
+                 if let Item::Impl(imp) = item {
+                     // Try to resolve Type
+                     if let syn::Type::Path(tp) = &*imp.self_ty {
+                         if let Some(segment) = tp.path.segments.last() {
+                             let type_name = segment.ident.to_string();
+                             for item in &imp.items {
+                                 if let syn::ImplItem::Fn(method) = item {
+                                     let method_name = method.sig.ident.to_string();
+                                     let id = format!("{}::{}@{}", type_name, method_name, crate_name);
+                                     let label = Some(format!("{}::{}", type_name, method_name)); // Label is Option<String>
+                                     
+                                     func_defs.push(CallGraphNode {
+                                         id, 
+                                         callees: Vec::new(), // Initialize with empty callees
+                                         label,
+                                     });
+                                 }
+                             }
+                         }
+                     }
+                 }
+            }
+        }
+
+        // Create a CallGraph from the collected nodes.
+        // The CallGraph constructor will likely convert this Vec<CallGraphNode> into a HashMap for efficient lookup.
+        let mut graph = CallGraph::new_from_nodes(func_defs);
+
+        // Step 2: Analyze bodies to add edges
+        for (crate_name, _, ast) in asts {
+             self.visit_ast_items(&ast.items, &mut graph, index, crate_name);
+        }
+
+        graph
+    }
+
+    fn visit_ast_items(&self, items: &[Item], graph: &mut CallGraph, index: &SymbolIndex, crate_name: &str) {
+        for item in items {
+            match item {
+                Item::Fn(func) => {
+                     let caller_id = format!("{}::{}", crate_name, func.sig.ident);
+                     let mut callees = Vec::new();
+                     for stmt in &func.block.stmts {
+                         visit_stmt(stmt, &mut callees, index, crate_name); // Changed to visit_stmt
+                     }
+                     for callee in callees {
+                         graph.add_edge(&caller_id, &callee);
+                     }
+                }
+                Item::Impl(imp) => {
+                     if let syn::Type::Path(tp) = &*imp.self_ty {
+                         if let Some(segment) = tp.path.segments.last() {
+                             let type_name = segment.ident.to_string();
+                             for item in &imp.items {
+                                 if let syn::ImplItem::Fn(method) = item {
+                                     let method_name = method.sig.ident.to_string();
+                                     let caller_id = format!("{}::{}@{}", type_name, method_name, crate_name);
+                                     let mut callees = Vec::new();
+                                     for stmt in &method.block.stmts {
+                                         visit_stmt(stmt, &mut callees, index, crate_name); // Changed to visit_stmt
+                                     }
+                                     for callee in callees {
+                                         graph.add_edge(&caller_id, &callee);
+                                     }
+                                 }
+                             }
+                         }
+                     }
+                }
+                Item::Mod(module) => {
+                    if let Some((_, content)) = &module.content {
+                         self.visit_ast_items(content, graph, index, crate_name);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
 impl crate::ports::CallGraphBuilder for SimpleCallGraphBuilder {
     fn build_call_graph(&self, files: &[(String, String, String)]) -> CallGraph {
         // Step 1: Build the global symbol index
         let index = SymbolIndex::build(files);
         
-        let mut func_defs = Vec::new();
-
-        // Step 2: Traverse files to build the graph
-        for (crate_name, file, code) in files {
-             // We can re-parse here or cache the ASTs. For simplicity/memory trade-off, we re-parse.
-             // Given build() consumed the files slice to read them, we assume it's cheap enough for now 
-             // (or we could have let build take ASTs, but that complicates the API).
-             // Actually index.rs parses `syn::parse_file` inside. We duplicate parsing here. 
-             // Optimization for later: parse once.
-             
+        // Parse all files into ASTs
+        let asts: Vec<(String, String, syn::File)> = files.iter().map(|(crate_name, file_path, code)| {
             let ast_file = syn::parse_file(code).expect("Parse error");
+            (crate_name.clone(), file_path.clone(), ast_file)
+        }).collect();
 
-            for item in &ast_file.items {
-                if let Item::Fn(func) = item {
-                    let name = func.sig.ident.to_string();
-                    let mut callees = vec![];
-                    
-                    // Pass index instead of impls list
-                    visit_stmts(&func.block.stmts, &mut callees, &index, crate_name);
-                    
-                    let line = func.sig.ident.span().start().line;
-                    let label = Some(format!("{}:{}", file, line));
-                    func_defs.push((name, crate_name.clone(), "".to_string(), callees, label));
-                }
-            }
-        }
-
-        // 封裝成 CallGraph
-        let nodes = func_defs.into_iter()
-            .map(|(name, crate_name, _path, callees, label)| {
-                CallGraphNode {
-                    id: format!("{}@{}", name, crate_name), // Canonical ID for entry points
-                    callees,
-                    label,
-                }
-            })
-            .collect();
-        CallGraph { nodes }
+        // Use the new build_from_asts method
+        self.build_from_asts(&index, &asts)
     }
 }
 
 // 遍歷語法樹、分析函式呼叫
-fn visit_stmts(
-    stmts: &Vec<Stmt>,
+fn visit_stmt( // Renamed from visit_stmts to visit_stmt
+    stmt: &Stmt, // Changed from &Vec<Stmt> to &Stmt
     callees: &mut Vec<String>,
     index: &SymbolIndex,
     crate_name: &str,
 ) {
-    for stmt in stmts {
-        match stmt {
-            Stmt::Expr(expr, _) => visit_expr(expr, callees, index, crate_name),
-            _ => {}
-        }
+    match stmt {
+        Stmt::Expr(expr, _) => visit_expr(expr, callees, index, crate_name),
+        _ => {}
     }
 }
 

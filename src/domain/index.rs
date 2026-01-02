@@ -37,23 +37,31 @@ impl Default for SymbolIndex {
 }
 
 impl SymbolIndex {
-    /// Build the symbol index from source files in parallel.
-    pub fn build(sources: &[(String, String, String)]) -> Self {
+    /// Build the symbol index from source files in parallel and return the parsed ASTs.
+    /// This enables "Parse Once" optimization: the ASTs are reused by the graph builder.
+    pub fn build(sources: &[(String, String, String)]) -> (Self, Vec<(String, String, syn::File)>) {
         let index = SymbolIndex::default();
 
-        // Parallel iteration over all source files
-        sources.par_iter().for_each(|(crate_name, file_path, code)| {
-            match syn::parse_file(code) {
-                Ok(ast) => {
-                    index.index_items(crate_name, file_path, &ast.items);
+        // Parallel parsing and AST collection
+        let results: Vec<Option<(String, String, syn::File)>> = sources.par_iter()
+            .map(|(crate_name, file_path, code)| {
+                match syn::parse_file(code) {
+                    Ok(ast) => {
+                        index.index_items(crate_name, file_path, &ast.items);
+                        Some((crate_name.clone(), file_path.clone(), ast))
+                    }
+                    Err(e) => {
+                        eprintln!("WARN: Failed to parse {}: {}", file_path, e);
+                        None
+                    }
                 }
-                Err(e) => {
-                    eprintln!("WARN: Failed to parse {}: {}", file_path, e);
-                }
-            }
-        });
+            })
+            .collect();
 
-        index
+        // Flatten results, discarding failures
+        let asts: Vec<(String, String, syn::File)> = results.into_iter().flatten().collect();
+
+        (index, asts)
     }
 
     /// Find all methods with a given name (for conservative resolution).

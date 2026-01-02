@@ -149,10 +149,7 @@ fn main() {
 
     if !entry.is_empty() && cli.expand_paths {
         // Init SourceManager
-        let mut source_manager = SourceManager::new();
-        for (_, file_path, content) in &files {
-            source_manager.load_file(file_path.clone(), content.clone());
-        }
+        let source_manager = SourceManager::new(&files);
 
         println!("\n=== Rich Trace Paths from {} ===", entry);
         let trace_gen = TraceGenerator::new(&callgraph, &source_manager);

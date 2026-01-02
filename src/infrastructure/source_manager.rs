@@ -1,27 +1,30 @@
-use std::collections::HashMap;
+use dashmap::DashMap;
 
-#[derive(Default)]
 pub struct SourceManager {
-    // Map absolute file path -> Lines
-    files: HashMap<String, Vec<String>>,
+    // path -> lines
+    files: DashMap<String, Vec<String>>,
 }
 
 impl SourceManager {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn load_file(&mut self, file_path: String, content: String) {
-        let lines = content.lines().map(|s| s.to_string()).collect();
-        self.files.insert(file_path, lines);
+    pub fn new(loaded_files: &[(String, String, String)]) -> Self {
+        let sm = SourceManager {
+            files: DashMap::new(),
+        };
+        for (_, file_path, content) in loaded_files {
+            let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+            sm.files.insert(file_path.clone(), lines);
+        }
+        sm
     }
 
     pub fn get_snippet(&self, file_path: &str, line_number: usize) -> Option<String> {
-        let lines = self.files.get(file_path)?;
-        // line_number is 1-indexed
-        if line_number == 0 || line_number > lines.len() {
-            return None;
+        if line_number == 0 { return None; }
+        // Attempt to retrieve using the path as is
+        if let Some(lines) = self.files.get(file_path) {
+            if line_number <= lines.len() {
+                return Some(lines[line_number - 1].trim().to_string());
+            }
         }
-        Some(lines[line_number - 1].trim().to_string())
+        None
     }
 }
