@@ -242,6 +242,10 @@ fn extract_label_from_symbol(symbol: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
+    use std::fs::File;
+    use std::io::Write;
+    use protobuf::Message;
 
     #[test]
     fn test_source_range_contains() {
@@ -274,4 +278,164 @@ mod tests {
         let label = extract_label_from_symbol(symbol);
         assert!(label.contains("my_method"));
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Mmap Loading Tests (Phase 3.3)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Helper to create a SCIP index file for testing
+    fn create_test_scip_index(
+        dir: &std::path::Path,
+        num_docs: usize,
+        defs_per_doc: usize,
+    ) -> std::path::PathBuf {
+        let mut index = scip::types::Index::new();
+
+        for doc_idx in 0..num_docs {
+            let mut doc = scip::types::Document::new();
+            doc.relative_path = format!("src/file_{}.rs", doc_idx);
+
+            for def_idx in 0..defs_per_doc {
+                let mut occ = scip::types::Occurrence::new();
+                occ.symbol = format!("pkg::file_{}::func_{}", doc_idx, def_idx);
+                let start_line = (def_idx * 20) as i32;
+                occ.range = vec![start_line, 0, start_line + 15, 0];
+                occ.symbol_roles = 1; // Definition bit
+                doc.occurrences.push(occ);
+            }
+
+            index.documents.push(doc);
+        }
+
+        let path = dir.join("test.scip");
+        let bytes = index.write_to_bytes().unwrap();
+        let mut file = File::create(&path).unwrap();
+        file.write_all(&bytes).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_mmap_loading_basic() {
+        let dir = tempdir().unwrap();
+        let scip_path = create_test_scip_index(dir.path(), 5, 10);
+        
+        let result = ScipIngestor::ingest_and_build_graph(&scip_path);
+        assert!(result.is_ok(), "Failed: {:?}", result.err());
+        
+        let graph = result.unwrap();
+        assert_eq!(graph.nodes.len(), 50); // 5 docs * 10 defs
+    }
+
+    #[test]
+    fn test_mmap_loading_empty_index() {
+        let dir = tempdir().unwrap();
+        
+        // Create an empty but valid SCIP index
+        let index = scip::types::Index::new();
+        let path = dir.path().join("empty.scip");
+        let bytes = index.write_to_bytes().unwrap();
+        let mut file = File::create(&path).unwrap();
+        file.write_all(&bytes).unwrap();
+        
+        let result = ScipIngestor::ingest_and_build_graph(&path);
+        assert!(result.is_ok());
+        
+        let graph = result.unwrap();
+        assert_eq!(graph.nodes.len(), 0);
+    }
+
+    #[test]
+    fn test_mmap_loading_large_index() {
+        let dir = tempdir().unwrap();
+        // 100 docs * 50 defs = 5000 definitions
+        let scip_path = create_test_scip_index(dir.path(), 100, 50);
+        
+        let result = ScipIngestor::ingest_and_build_graph(&scip_path);
+        assert!(result.is_ok(), "Failed: {:?}", result.err());
+        
+        let graph = result.unwrap();
+        assert_eq!(graph.nodes.len(), 5000);
+    }
+
+    #[test]
+    fn test_mmap_loading_nonexistent_file() {
+        let result = ScipIngestor::ingest_and_build_graph(Path::new("/nonexistent/path/index.scip"));
+        assert!(result.is_err());
+        
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Failed to open"));
+    }
+
+    #[test]
+    fn test_mmap_loading_invalid_protobuf() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("invalid.scip");
+        
+        // Write invalid data
+        let mut file = File::create(&path).unwrap();
+        file.write_all(b"this is not a valid protobuf").unwrap();
+        
+        let result = ScipIngestor::ingest_and_build_graph(&path);
+        assert!(result.is_err());
+        
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Failed to parse"));
+    }
+
+    #[test]
+    fn test_parallel_processing_correctness() {
+        let dir = tempdir().unwrap();
+        
+        // Create index with references to test edge creation
+        let mut index = scip::types::Index::new();
+        
+        // File 1: defines func_a
+        let mut doc1 = scip::types::Document::new();
+        doc1.relative_path = "src/a.rs".to_string();
+        let mut def_a = scip::types::Occurrence::new();
+        def_a.symbol = "pkg::func_a".to_string();
+        def_a.range = vec![0, 0, 20, 0];
+        def_a.symbol_roles = 1; // Definition
+        doc1.occurrences.push(def_a);
+        
+        // Reference to func_b inside func_a
+        let mut ref_b = scip::types::Occurrence::new();
+        ref_b.symbol = "pkg::func_b".to_string();
+        ref_b.range = vec![10, 5, 15]; // Inside func_a
+        ref_b.symbol_roles = 0; // Reference
+        doc1.occurrences.push(ref_b);
+        
+        index.documents.push(doc1);
+        
+        // File 2: defines func_b
+        let mut doc2 = scip::types::Document::new();
+        doc2.relative_path = "src/b.rs".to_string();
+        let mut def_b = scip::types::Occurrence::new();
+        def_b.symbol = "pkg::func_b".to_string();
+        def_b.range = vec![0, 0, 10, 0];
+        def_b.symbol_roles = 1; // Definition
+        doc2.occurrences.push(def_b);
+        
+        index.documents.push(doc2);
+        
+        // Write index
+        let path = dir.path().join("refs.scip");
+        let bytes = index.write_to_bytes().unwrap();
+        let mut file = File::create(&path).unwrap();
+        file.write_all(&bytes).unwrap();
+        
+        let result = ScipIngestor::ingest_and_build_graph(&path);
+        assert!(result.is_ok());
+        
+        let graph = result.unwrap();
+        
+        // Should have 2 definitions
+        assert_eq!(graph.nodes.len(), 2);
+        
+        // func_a should call func_b
+        let func_a = graph.nodes.iter().find(|n| n.id == "pkg::func_a");
+        assert!(func_a.is_some());
+        assert!(func_a.unwrap().callees.contains(&"pkg::func_b".to_string()));
+    }
 }
+
