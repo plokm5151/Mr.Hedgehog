@@ -19,7 +19,7 @@ pub fn start_server(port: u16) -> Result<()> {
     let listener = TcpListener::bind(&address)
         .with_context(|| format!("Failed to bind to {}", address))?;
 
-    println!("[Mr. Hedgehog] API Server listening on {}", address);
+    println!("TraceCraft Daemon listening on {}", address);
 
     for stream in listener.incoming() {
         match stream {

@@ -4,7 +4,7 @@
 /// external tools (scip-python, rust-analyzer) to be installed.
 
 use mr_hedgehog::domain::language::Language;
-use mr_hedgehog::infrastructure::scip_runner::{build_command_spec, ScipCommandSpec};
+use mr_hedgehog::infrastructure::scip_runner::build_command_spec;
 
 /// Verify that the Language enum correctly parses string inputs.
 #[test]
