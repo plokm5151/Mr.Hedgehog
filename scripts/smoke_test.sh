@@ -18,7 +18,13 @@ if [ ! -f "$TARGET_BIN" ]; then
     exit 1
 fi
 
-./"$TARGET_BIN" --workspace test_advanced_ws/Cargo.toml --output result.dot --expand_paths
+set -x # Enable debug printing of commands
+./"$TARGET_BIN" --workspace test_advanced_ws/Cargo.toml --output result.dot --expand-paths --debug || {
+    echo "Command failed! Showing help:"
+    ./"$TARGET_BIN" --help
+    exit 1
+}
+set +x
 
 # Step 4: Verify result.dot exists and is greater than 0 bytes
 if [ -s result.dot ]; then

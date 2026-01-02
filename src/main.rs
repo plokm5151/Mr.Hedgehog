@@ -40,6 +40,10 @@ struct Cli {
     /// 分支 event 摘要模式（if/match 分支遇到相同 event 只記一次，不重複展開）
     #[arg(long)]
     branch_summary: bool,
+
+    /// Enable debug output
+    #[arg(long, short='D')]
+    debug: bool,
 }
 
 fn collect_rs(dir:&str, crate_name:&str)->Vec<(String,String,String)> {
@@ -76,6 +80,11 @@ fn parse_ws(ws:&str)->Vec<(String,String)> {
 
 fn main() {
     let cli=Cli::parse();
+
+    if cli.debug {
+        println!("[DEBUG] Config: {:?}", cli);
+    }
+
     let mut files=Vec::<(String,String,String)>::new();
 
     // single files
@@ -150,9 +159,11 @@ fn main() {
     }
 
     // ── 3. trace from main，分支摘要模式 ──────────────────
-    println!("\n==== [DEBUG nodes] ====");
-    for n in &callgraph.nodes{println!("{} -> {:?}",n.id,n.callees);}
-    println!("========================");
+    if cli.debug {
+        println!("\n==== [DEBUG nodes] ====");
+        for n in &callgraph.nodes{println!("{} -> {:?}",n.id,n.callees);}
+        println!("========================");
+    }
 
     let mut all_paths: Vec<Vec<String>> = Vec::new();
     if !entry.is_empty() && cli.expand_paths {
