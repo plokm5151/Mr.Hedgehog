@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use tracecraft::infrastructure::{SimpleCallGraphBuilder, DotExporter};
 use tracecraft::infrastructure::project_loader::ProjectLoader;
+use tracecraft::infrastructure::source_manager::SourceManager;
+use tracecraft::domain::trace::TraceGenerator;
 use tracecraft::ports::{CallGraphBuilder, OutputExporter};
 
 #[derive(Parser, Debug)]
@@ -130,56 +132,44 @@ fn main() {
         return;
     }
 
-    // ── 3. trace from main，分支摘要模式 ──────────────────
+    // ── 3. trace from main ──────────────────
     if cli.debug {
         println!("\n==== [DEBUG nodes] ====");
         for n in &callgraph.nodes{println!("{} -> {:?}",n.id,n.callees);}
         println!("========================");
     }
 
-    let mut all_paths: Vec<Vec<String>> = Vec::new();
     if !entry.is_empty() && cli.expand_paths {
-        fn dfs_expand(
-            node_id: &str,
-            map: &HashMap<String,&tracecraft::domain::callgraph::CallGraphNode>,
-            path: &mut Vec<String>,
-            all_paths: &mut Vec<Vec<String>>,
-            depth: usize,
-            branch_summary: bool,
-            branch_event_set: &mut HashSet<String>
-        ) {
-            if depth > 128 { return; }
-            if let Some(n) = map.get(node_id) {
-                if n.callees.is_empty() {
-                    all_paths.push(path.clone());
-                } else {
-                    for callee in &n.callees {
-                        // 判斷是否為分支 event
-                        let is_branch_event = callee.starts_with("if(") || callee.starts_with("match(") || callee.starts_with("match_arm");
-                        if branch_summary && is_branch_event {
-                            if branch_event_set.contains(callee) { continue; }
-                            branch_event_set.insert(callee.clone());
-                        }
-                        if path.contains(callee) { continue; }
-                        path.push(callee.clone());
-                        dfs_expand(callee, map, path, all_paths, depth+1, branch_summary, branch_event_set);
-                        path.pop();
-                        if branch_summary && is_branch_event {
-                            branch_event_set.remove(callee);
-                        }
-                    }
-                }
-            }
+        // Init SourceManager
+        let mut source_manager = SourceManager::new();
+        for (_, file_path, content) in &files {
+            source_manager.load_file(file_path.clone(), content.clone());
         }
-        let mut path = vec![entry.clone()];
-        let mut branch_event_set = HashSet::new();
-        dfs_expand(&entry, &map, &mut path, &mut all_paths, 0, cli.branch_summary, &mut branch_event_set);
 
-        println!("\n=== All call paths from entry (main) ===");
-        for (i, p) in all_paths.iter().enumerate() {
-            println!("Path {}:", i+1);
-            for seg in p {
-                println!("  {}", seg);
+        println!("\n=== Rich Trace Paths from {} ===", entry);
+        let trace_gen = TraceGenerator::new(&callgraph, &source_manager);
+        let paths = trace_gen.generate_paths(&entry);
+
+        if paths.is_empty() {
+             println!("No paths found.");
+        }
+
+        for (i, path) in paths.iter().enumerate() {
+            println!("Path {}:", i + 1);
+            for (step_idx, step) in path.steps.iter().enumerate() {
+                let location = step.location.as_deref().unwrap_or("?");
+                let note = step.note.as_deref().unwrap_or("");
+                let note_str = if !note.is_empty() { format!(" {}", note) } else { "".to_string() };
+                
+                // Indentation based on depth (step.depth or just loop index? 
+                // trace.rs sets depth. Let's use it.)
+                let indent = "  ".repeat(step.depth);
+                
+                println!("{}[{}] {}{} ({})", indent, step_idx, step.id, note_str, location);
+                
+                if let Some(code) = &step.snippet {
+                    println!("{}    Code: {}", indent, code);
+                }
             }
             println!();
         }
