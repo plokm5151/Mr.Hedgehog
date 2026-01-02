@@ -106,7 +106,7 @@ impl SymbolIndex {
                                     self.type_methods.insert((type_name.clone(), method_name.clone()), sig);
                                     
                                     // Populate acceleration map
-                                    self.method_lookup.entry(method_name)
+                                    self.method_lookup.entry(method_name.clone())
                                         .or_default()
                                         .push((type_name.clone(), method_name.clone())); // Store key for type_methods
                                 }
