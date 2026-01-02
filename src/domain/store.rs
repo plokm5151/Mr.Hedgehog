@@ -1,7 +1,6 @@
 use crate::domain::index::FunctionSignature;
 use dashmap::DashMap;
 use sled::Db;
-use std::sync::Arc;
 
 /// Trait for symbol storage backends.
 /// Implementations must be thread-safe (Send + Sync).

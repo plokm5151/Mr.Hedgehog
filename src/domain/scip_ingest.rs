@@ -45,12 +45,21 @@ pub struct ScipIngestor;
 impl ScipIngestor {
     /// Ingest a SCIP index file and build a CallGraph.
     pub fn ingest_and_build_graph(scip_path: &Path) -> Result<CallGraph> {
-        use scip::types::{Index, Occurrence};
+        use std::fs::File;
+        use std::io::Read;
+        use protobuf::Message;
 
         println!("[SCIP Ingest] Loading index from: {}", scip_path.display());
         
-        let index = scip::read_index_from_file(scip_path)
+        // Read the SCIP index file
+        let mut file = File::open(scip_path)
+            .context("Failed to open SCIP index file")?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)
             .context("Failed to read SCIP index file")?;
+        
+        let index = scip::types::Index::parse_from_bytes(&buffer)
+            .context("Failed to parse SCIP index protobuf")?;
 
         // Pass 1: Collect all Definitions per file
         // Map: file_path -> Vec<DefinitionInfo>

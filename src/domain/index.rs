@@ -1,4 +1,4 @@
-use dashmap::DashMap;
+
 use rayon::prelude::*;
 use syn::{Item, Type, Visibility};
 
@@ -14,6 +14,14 @@ pub struct FunctionSignature {
 }
 
 use std::sync::Arc;
+use crate::domain::store::SymbolStore;
+
+/// Error encountered during analysis/parsing.
+#[derive(Debug, Clone)]
+pub struct AnalysisError {
+    pub file: String,
+    pub error: String,
+}
 
 /// Thread-safe symbol index that delegates storage to a SymbolStore backend.
 /// Enables parallel parsing and indexing with either memory or disk persistence.
@@ -24,12 +32,6 @@ pub struct SymbolIndex {
 impl SymbolIndex {
     pub fn new(store: Arc<dyn SymbolStore>) -> Self {
         Self { store }
-    }
-
-    #[derive(Debug, Clone)]
-    pub struct AnalysisError {
-        pub file: String,
-        pub error: String,
     }
 
     /// Build the symbol index from source files in parallel and return any errors.
