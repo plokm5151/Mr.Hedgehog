@@ -47,7 +47,7 @@ else
 fi
 
 # Step 5: (Optional) Simple grep check for expected output
-if grep -q "main@bin_demo" result.dot; then
+if grep -q "bin_demo::main" result.dot; then
      echo "Verification Passed: Found 'main@bin_demo' in result.dot"
 else
      echo "Verification Failed: 'main@bin_demo' not found in result.dot"
