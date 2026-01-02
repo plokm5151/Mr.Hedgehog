@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use dashmap::DashMap;
+use rayon::prelude::*;
 use syn::{Item, Type, Visibility};
 
 #[derive(Debug, Clone)]
@@ -6,54 +7,68 @@ pub struct FunctionSignature {
     pub name: String,
     pub is_public: bool,
     pub receiver: Option<String>, // "&self", "self", or None for static
-    pub location: String,         // crate::file:line
+    pub location: String,         // file:line
     pub crate_name: String,
 }
 
-#[derive(Debug, Default)]
+/// Thread-safe symbol index using DashMap for concurrent access.
+/// Enables parallel parsing and indexing of source files.
 pub struct SymbolIndex {
-    // Key: crate::mod::func (Note: currently we only track crate::func because we flatten modules)
-    pub global_functions: HashMap<String, FunctionSignature>,
+    // Key: crate::func
+    pub global_functions: DashMap<String, FunctionSignature>,
     
-    // Key: (Type, Method)
-    pub type_methods: HashMap<(String, String), FunctionSignature>,
+    // Key: (TypeName, MethodName)
+    pub type_methods: DashMap<(String, String), FunctionSignature>,
 
-    // Key: Method Name -> List of (Type Name, Crate Name)
-    // Acceleration map for resolving "obj.foo()" when we don't know the type of obj.
-    pub method_lookup: HashMap<String, Vec<(String, String)>>,
+    // Acceleration map: MethodName -> Vec<(TypeName, MethodName)>
+    pub method_lookup: DashMap<String, Vec<(String, String)>>,
+}
+
+impl Default for SymbolIndex {
+    fn default() -> Self {
+        Self {
+            global_functions: DashMap::new(),
+            type_methods: DashMap::new(),
+            method_lookup: DashMap::new(),
+        }
+    }
 }
 
 impl SymbolIndex {
+    /// Build the symbol index from source files in parallel.
     pub fn build(sources: &[(String, String, String)]) -> Self {
-        let mut index = SymbolIndex::default();
+        let index = SymbolIndex::default();
 
-        for (crate_name, file_path, code) in sources {
-            // For robustness, parse errors in individual files shouldn't panic the whole process
-            if let Ok(ast) = syn::parse_file(code) {
-                index.index_file(crate_name, file_path, &ast);
-            } else {
-                eprintln!("WARN: Failed to parse {}", file_path);
+        // Parallel iteration over all source files
+        sources.par_iter().for_each(|(crate_name, file_path, code)| {
+            match syn::parse_file(code) {
+                Ok(ast) => {
+                    index.index_items(crate_name, file_path, &ast.items);
+                }
+                Err(e) => {
+                    eprintln!("WARN: Failed to parse {}: {}", file_path, e);
+                }
             }
-        }
+        });
 
         index
     }
 
-    pub fn find_methods_by_name(&self, method_name: &str) -> Vec<&FunctionSignature> {
+    /// Find all methods with a given name (for conservative resolution).
+    /// Returns cloned signatures to avoid holding DashMap locks.
+    pub fn find_methods_by_name(&self, method_name: &str) -> Vec<FunctionSignature> {
         if let Some(candidates) = self.method_lookup.get(method_name) {
-            candidates.iter()
-                .filter_map(|key| self.type_methods.get(key))
+            candidates
+                .iter()
+                .filter_map(|key| self.type_methods.get(key).map(|r| r.clone()))
                 .collect()
         } else {
             Vec::new()
         }
     }
 
-    fn index_file(&mut self, crate_name: &str, file_path: &str, ast: &syn::File) {
-        self.index_items(crate_name, file_path, &ast.items);
-    }
-
-    fn index_items(&mut self, crate_name: &str, file_path: &str, items: &[Item]) {
+    /// Index all items in a list (recursive for nested modules).
+    fn index_items(&self, crate_name: &str, file_path: &str, items: &[Item]) {
         for item in items {
             match item {
                 Item::Fn(func) => {
@@ -62,9 +77,7 @@ impl SymbolIndex {
                     let span = func.sig.ident.span();
                     let line = span.start().line;
                     
-                    // TODO: Handle nested modules properly. 
-                    // For now, consistent with legacy behavior, we flatten file paths but create unique IDs via crates.
-                    let qualified_name = format!("{}::{}", crate_name, name); // Simple crate::func
+                    let qualified_name = format!("{}::{}", crate_name, name);
 
                     let sig = FunctionSignature {
                         name: name.clone(),
@@ -76,27 +89,25 @@ impl SymbolIndex {
                     self.global_functions.insert(qualified_name, sig);
                 }
                 Item::Impl(imp) => {
-                    // Try to resolve the Type name
                     if let Type::Path(tp) = &*imp.self_ty {
-                        // Simple extraction of the last segment (e.g., "MyType" from "crate::MyType")
                         if let Some(segment) = tp.path.segments.last() {
                             let type_name = segment.ident.to_string();
                             
-                            for item in &imp.items {
-                                if let syn::ImplItem::Fn(method) = item {
+                            for impl_item in &imp.items {
+                                if let syn::ImplItem::Fn(method) = impl_item {
                                     let method_name = method.sig.ident.to_string();
                                     let is_public = matches!(method.vis, Visibility::Public(_));
                                     let span = method.sig.ident.span();
                                     let line = span.start().line;
 
                                     let receiver = method.sig.inputs.first().and_then(|arg| {
-                                         match arg {
-                                             syn::FnArg::Receiver(r) => {
-                                                 if r.reference.is_some() { Some("&self".to_string()) }
-                                                 else { Some("self".to_string()) }
-                                             },
-                                             _ => None,
-                                         }
+                                        match arg {
+                                            syn::FnArg::Receiver(r) => {
+                                                if r.reference.is_some() { Some("&self".to_string()) }
+                                                else { Some("self".to_string()) }
+                                            },
+                                            _ => None,
+                                        }
                                     });
 
                                     let sig = FunctionSignature {
@@ -107,19 +118,21 @@ impl SymbolIndex {
                                         crate_name: crate_name.to_string(),
                                     };
 
-                                    self.type_methods.insert((type_name.clone(), method_name.clone()), sig);
+                                    let key = (type_name.clone(), method_name.clone());
+                                    self.type_methods.insert(key.clone(), sig);
                                     
-                                    // Populate acceleration map
-                                    self.method_lookup.entry(method_name.clone())
+                                    // Thread-safe append to method_lookup
+                                    self.method_lookup
+                                        .entry(method_name.clone())
                                         .or_default()
-                                        .push((type_name.clone(), method_name.clone())); // Store key for type_methods
+                                        .push(key);
                                 }
                             }
                         }
                     }
                 }
                 Item::Mod(module) => {
-                    // Recurse into inline modules (common in cargo-expand output)
+                    // Recurse into inline modules
                     if let Some((_, content)) = &module.content {
                         self.index_items(crate_name, file_path, content);
                     }

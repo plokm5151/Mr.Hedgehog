@@ -108,9 +108,10 @@ fn visit_expr(
 
             // Strategy 1: Exact match via inferred type
             if let Some(rt) = &receiver_type {
-                if let Some(sig) = index.type_methods.get(&(rt.clone(), method_name.clone())) {
-                     // Found it! Use canonical ID.
-                     let callee_id = format!("{}::{}@{}", rt, method_name, sig.crate_name);
+                let key = (rt.clone(), method_name.clone());
+                if let Some(sig_ref) = index.type_methods.get(&key) {
+                     // Found it! Use canonical ID. Dereference the Ref guard.
+                     let callee_id = format!("{}::{}@{}", rt, method_name, sig_ref.crate_name);
                      callees.push(callee_id);
                      resolved = true;
                 }
@@ -120,19 +121,12 @@ fn visit_expr(
             if !resolved {
                 let candidates = index.find_methods_by_name(&method_name);
                 if !candidates.is_empty() {
-                    // We found one or more methods with this name. Link to ALL of them.
-                    // This is conservative: "It could be any of these".
-                    
-                    // Actually, let's just use the public method_lookup map directly since fields are public in struct.
-                    if let Some(keys) = index.method_lookup.get(&method_name) {
-                        for (type_name, _) in keys {
-                             if let Some(sig) = index.type_methods.get(&(type_name.clone(), method_name.clone())) {
-                                 let callee_id = format!("{}::{}@{}", type_name, method_name, sig.crate_name);
-                                 callees.push(callee_id);
-                             }
-                        }
-                        resolved = true;
+                    // Link to ALL matching methods (conservative approach)
+                    for sig in candidates {
+                        let callee_id = format!("{}::{}@{}", sig.name, method_name, sig.crate_name);
+                        callees.push(callee_id);
                     }
+                    resolved = true;
                 }
             }
 
