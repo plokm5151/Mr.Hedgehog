@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use tracecraft::infrastructure::{SimpleCallGraphBuilder, DotExporter};
 use tracecraft::infrastructure::project_loader::ProjectLoader;
 use tracecraft::infrastructure::source_manager::SourceManager;
+use tracecraft::infrastructure::concurrency;
 use tracecraft::domain::trace::TraceGenerator;
 use tracecraft::ports::{CallGraphBuilder, OutputExporter};
 
@@ -57,6 +58,11 @@ struct Cli {
 }
 
 fn main() {
+    // Initialize adaptive thread pool (reserves 50% CPU for UI/LSP)
+    if let Err(e) = concurrency::init_thread_pool() {
+        eprintln!("Warning: Failed to initialize thread pool: {}. Using defaults.", e);
+    }
+
     let cli=Cli::parse();
 
     if cli.debug {

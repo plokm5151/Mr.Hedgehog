@@ -5,6 +5,7 @@ use crate::domain::index::SymbolIndex;
 pub mod project_loader;
 pub mod source_manager;
 pub mod expander;
+pub mod concurrency;
 
 use std::sync::Arc;
 
