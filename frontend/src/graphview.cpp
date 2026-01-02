@@ -6,12 +6,112 @@
 #include <QPainter>
 #include <QRegularExpression>
 #include <QDebug>
+#include <QResizeEvent>
 #include <cmath>
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Hedgehog Implementation
+// ═══════════════════════════════════════════════════════════════════════════
+
+Hedgehog::Hedgehog(QGraphicsItem *parent)
+    : QGraphicsTextItem(parent)
+    , m_speed(2.0)
+    , m_changeDirectionCounter(0)
+    , m_facingRight(true)
+{
+    // Use hedgehog emoji 🦔
+    setPlainText("🦔");
+    
+    QFont font = this->font();
+    font.setPointSize(32);
+    setFont(font);
+    
+    setZValue(100); // Always on top
+    
+    // Random initial velocity
+    pickNewTarget();
+}
+
+void Hedgehog::setSceneBounds(const QRectF &bounds)
+{
+    m_bounds = bounds;
+}
+
+void Hedgehog::pickNewTarget()
+{
+    // Pick a random target within bounds
+    if (m_bounds.isValid()) {
+        qreal marginX = m_bounds.width() * 0.1;
+        qreal marginY = m_bounds.height() * 0.1;
+        
+        m_targetPos = QPointF(
+            m_bounds.left() + marginX + QRandomGenerator::global()->bounded(m_bounds.width() - 2 * marginX),
+            m_bounds.top() + marginY + QRandomGenerator::global()->bounded(m_bounds.height() - 2 * marginY)
+        );
+    } else {
+        m_targetPos = QPointF(
+            QRandomGenerator::global()->bounded(500) - 250,
+            QRandomGenerator::global()->bounded(400) - 200
+        );
+    }
+    
+    m_changeDirectionCounter = QRandomGenerator::global()->bounded(100, 300);
+}
+
+void Hedgehog::randomWalk()
+{
+    QPointF currentPos = pos();
+    
+    // Calculate direction to target
+    QPointF direction = m_targetPos - currentPos;
+    qreal distance = std::sqrt(direction.x() * direction.x() + direction.y() * direction.y());
+    
+    // If close to target or counter expired, pick new target
+    m_changeDirectionCounter--;
+    if (distance < 20 || m_changeDirectionCounter <= 0) {
+        pickNewTarget();
+        direction = m_targetPos - currentPos;
+        distance = std::sqrt(direction.x() * direction.x() + direction.y() * direction.y());
+    }
+    
+    // Normalize and apply speed
+    if (distance > 0) {
+        direction /= distance;
+        
+        // Add some wobble for natural movement
+        qreal wobble = (QRandomGenerator::global()->bounded(100) - 50) / 100.0;
+        direction.setY(direction.y() + wobble * 0.2);
+        
+        QPointF newPos = currentPos + direction * m_speed;
+        
+        // Flip hedgehog based on direction
+        if (direction.x() < -0.1 && m_facingRight) {
+            setScale(-1);
+            m_facingRight = false;
+        } else if (direction.x() > 0.1 && !m_facingRight) {
+            setScale(1);
+            m_facingRight = true;
+        }
+        
+        // Boundary check
+        if (m_bounds.isValid()) {
+            newPos.setX(qBound(m_bounds.left(), newPos.x(), m_bounds.right() - 50));
+            newPos.setY(qBound(m_bounds.top(), newPos.y(), m_bounds.bottom() - 50));
+        }
+        
+        setPos(newPos);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GraphView Implementation
+// ═══════════════════════════════════════════════════════════════════════════
 
 GraphView::GraphView(QWidget *parent)
     : QGraphicsView(parent)
     , m_scene(nullptr)
     , m_placeholderText(nullptr)
+    , m_animationTimer(nullptr)
 {
     setupScene();
     
@@ -29,12 +129,23 @@ GraphView::GraphView(QWidget *parent)
     // Frame style
     setFrameShape(QFrame::NoFrame);
     
-    // Show initial placeholder
-    showPlaceholder("Select a folder and click 'Run Analysis'\nto visualize the call graph");
+    // Setup animation timer for hedgehogs (60 FPS)
+    m_animationTimer = new QTimer(this);
+    connect(m_animationTimer, &QTimer::timeout, this, &GraphView::updateHedgehogs);
+    m_animationTimer->start(16); // ~60 FPS
+    
+    // Show initial placeholder with hedgehogs
+    showPlaceholder("Select a folder and click 'Run Analysis'\nto visualize the call graph\n\n🦔 Mr. Hedgehog is watching... 🦔");
+    
+    // Spawn hedgehogs
+    spawnHedgehogs();
 }
 
 GraphView::~GraphView()
 {
+    if (m_animationTimer) {
+        m_animationTimer->stop();
+    }
     delete m_scene;
 }
 
@@ -42,6 +153,50 @@ void GraphView::setupScene()
 {
     m_scene = new QGraphicsScene(this);
     setScene(m_scene);
+}
+
+void GraphView::spawnHedgehogs()
+{
+    // Create two hedgehogs
+    for (int i = 0; i < 2; ++i) {
+        Hedgehog *hedgehog = new Hedgehog();
+        
+        // Random starting position
+        hedgehog->setPos(
+            QRandomGenerator::global()->bounded(400) - 200,
+            QRandomGenerator::global()->bounded(300) - 150
+        );
+        
+        m_scene->addItem(hedgehog);
+        m_hedgehogs.append(hedgehog);
+    }
+    
+    // Set initial bounds
+    QRectF bounds = sceneRect();
+    if (!bounds.isValid() || bounds.isEmpty()) {
+        bounds = QRectF(-300, -200, 600, 400);
+    }
+    for (Hedgehog *h : m_hedgehogs) {
+        h->setSceneBounds(bounds);
+    }
+}
+
+void GraphView::updateHedgehogs()
+{
+    for (Hedgehog *hedgehog : m_hedgehogs) {
+        hedgehog->randomWalk();
+    }
+}
+
+void GraphView::resizeEvent(QResizeEvent *event)
+{
+    QGraphicsView::resizeEvent(event);
+    
+    // Update hedgehog bounds when view resizes
+    QRectF bounds = mapToScene(viewport()->rect()).boundingRect();
+    for (Hedgehog *h : m_hedgehogs) {
+        h->setSceneBounds(bounds);
+    }
 }
 
 void GraphView::loadDotFile(const QString &filePath)
@@ -61,21 +216,27 @@ void GraphView::loadDotFile(const QString &filePath)
 
 void GraphView::parseDotFile(const QString &content)
 {
-    clear();
+    // Keep hedgehogs, clear everything else
+    for (Hedgehog *h : m_hedgehogs) {
+        m_scene->removeItem(h);
+    }
+    m_scene->clear();
+    m_nodes.clear();
+    m_placeholderText = nullptr;
+    
+    // Re-add hedgehogs
+    for (Hedgehog *h : m_hedgehogs) {
+        m_scene->addItem(h);
+    }
     
     // Parse DOT format
-    // Nodes: "nodeid" [label="Node Label"];
-    // Edges: "from" -> "to";
-    
     QStringList lines = content.split('\n');
     QList<QPair<QString, QString>> edges;
     
-    // First pass: extract nodes
     QRegularExpression nodeRegex("\"([^\"]+)\"\\s*\\[label=\"([^\"]+)\"\\]");
     QRegularExpression edgeRegex("\"([^\"]+)\"\\s*->\\s*\"([^\"]+)\"");
     
     for (const QString &line : lines) {
-        // Check for node definition
         QRegularExpressionMatch nodeMatch = nodeRegex.match(line);
         if (nodeMatch.hasMatch()) {
             QString id = nodeMatch.captured(1);
@@ -84,7 +245,6 @@ void GraphView::parseDotFile(const QString &content)
             continue;
         }
         
-        // Check for edge definition
         QRegularExpressionMatch edgeMatch = edgeRegex.match(line);
         if (edgeMatch.hasMatch()) {
             QString from = edgeMatch.captured(1);
@@ -93,19 +253,21 @@ void GraphView::parseDotFile(const QString &content)
         }
     }
     
-    // Layout nodes
     layoutGraph();
     
-    // Create edges
     for (const auto &edge : edges) {
         createEdge(edge.first, edge.second);
     }
     
-    // Fit view
     if (!m_nodes.isEmpty()) {
         setSceneRect(m_scene->itemsBoundingRect().adjusted(-50, -50, 50, 50));
         fitInView(m_scene->itemsBoundingRect(), Qt::KeepAspectRatio);
-        scale(0.9, 0.9); // Slight zoom out
+        scale(0.9, 0.9);
+        
+        // Update hedgehog bounds
+        for (Hedgehog *h : m_hedgehogs) {
+            h->setSceneBounds(m_scene->itemsBoundingRect());
+        }
     } else {
         showPlaceholder("No nodes found in the call graph");
     }
@@ -117,14 +279,12 @@ QGraphicsEllipseItem* GraphView::createNode(const QString &id, const QString &la
         return m_nodes[id];
     }
     
-    // Create rounded rectangle (using ellipse with large radius for rounded look)
     QGraphicsEllipseItem *node = m_scene->addEllipse(
         0, 0, NODE_WIDTH, NODE_HEIGHT,
         QPen(QColor("#89b4fa"), 2),
         QBrush(QColor("#313244"))
     );
     
-    // Add label
     QString displayLabel = label;
     if (displayLabel.length() > 20) {
         displayLabel = displayLabel.right(20);
@@ -135,7 +295,6 @@ QGraphicsEllipseItem* GraphView::createNode(const QString &id, const QString &la
     text->setDefaultTextColor(QColor("#cdd6f4"));
     text->setParentItem(node);
     
-    // Center text in node
     QRectF textRect = text->boundingRect();
     text->setPos(
         (NODE_WIDTH - textRect.width()) / 2,
@@ -155,18 +314,15 @@ void GraphView::createEdge(const QString &from, const QString &to)
     QGraphicsEllipseItem *fromNode = m_nodes[from];
     QGraphicsEllipseItem *toNode = m_nodes[to];
     
-    // Calculate center points
     QPointF fromCenter = fromNode->pos() + QPointF(NODE_WIDTH / 2, NODE_HEIGHT);
     QPointF toCenter = toNode->pos() + QPointF(NODE_WIDTH / 2, 0);
     
-    // Create arrow line
     QGraphicsLineItem *line = m_scene->addLine(
         QLineF(fromCenter, toCenter),
         QPen(QColor("#a6adc8"), 1.5)
     );
-    line->setZValue(-1); // Behind nodes
+    line->setZValue(-1);
     
-    // Add arrowhead
     qreal angle = std::atan2(toCenter.y() - fromCenter.y(), toCenter.x() - fromCenter.x());
     qreal arrowSize = 10;
     
@@ -194,7 +350,6 @@ void GraphView::layoutGraph()
 {
     if (m_nodes.isEmpty()) return;
     
-    // Simple hierarchical layout
     int row = 0;
     int col = 0;
     int maxCols = 5;
@@ -212,7 +367,17 @@ void GraphView::layoutGraph()
 
 void GraphView::showPlaceholder(const QString &message)
 {
-    clear();
+    // Keep hedgehogs, clear everything else
+    for (Hedgehog *h : m_hedgehogs) {
+        m_scene->removeItem(h);
+    }
+    m_scene->clear();
+    m_nodes.clear();
+    
+    // Re-add hedgehogs
+    for (Hedgehog *h : m_hedgehogs) {
+        m_scene->addItem(h);
+    }
     
     m_placeholderText = m_scene->addText(message);
     m_placeholderText->setDefaultTextColor(QColor("#6c7086"));
@@ -221,23 +386,35 @@ void GraphView::showPlaceholder(const QString &message)
     font.setPointSize(16);
     m_placeholderText->setFont(font);
     
-    // Center the text
     QRectF textRect = m_placeholderText->boundingRect();
     m_placeholderText->setPos(-textRect.width() / 2, -textRect.height() / 2);
     
     setSceneRect(m_scene->itemsBoundingRect().adjusted(-100, -100, 100, 100));
+    
+    // Update hedgehog bounds
+    for (Hedgehog *h : m_hedgehogs) {
+        h->setSceneBounds(sceneRect());
+    }
 }
 
 void GraphView::clear()
 {
+    // Keep hedgehogs, clear everything else
+    for (Hedgehog *h : m_hedgehogs) {
+        m_scene->removeItem(h);
+    }
     m_scene->clear();
     m_nodes.clear();
     m_placeholderText = nullptr;
+    
+    // Re-add hedgehogs
+    for (Hedgehog *h : m_hedgehogs) {
+        m_scene->addItem(h);
+    }
 }
 
 void GraphView::wheelEvent(QWheelEvent *event)
 {
-    // Zoom with mouse wheel
     const qreal scaleFactor = 1.1;
     
     if (event->angleDelta().y() > 0) {
@@ -251,7 +428,6 @@ void GraphView::drawBackground(QPainter *painter, const QRectF &rect)
 {
     QGraphicsView::drawBackground(painter, rect);
     
-    // Draw subtle grid
     painter->setPen(QPen(QColor("#1e1e2e"), 0.5));
     
     qreal gridSize = 50;

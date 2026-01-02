@@ -1,2 +1,2 @@
-set(__QT_DEPLOY_TARGET_TraceCraftUI_FILE /Users/frank_d_chen/Downloads/Tracecraft/frontend/build/TraceCraftUI.app/Contents/MacOS/TraceCraftUI)
-set(__QT_DEPLOY_TARGET_TraceCraftUI_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_MrHedgehogUI_FILE /Users/frank_d_chen/Downloads/Tracecraft/frontend/build/MrHedgehogUI.app/Contents/MacOS/MrHedgehogUI)
+set(__QT_DEPLOY_TARGET_MrHedgehogUI_TYPE EXECUTABLE)

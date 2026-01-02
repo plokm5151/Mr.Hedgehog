@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Mr. HedgehogUI VERSION 0.4.0 LANGUAGES CXX)
+project(MrHedgehogUI VERSION 0.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,14 +27,14 @@ set(RESOURCES
 )
 
 # Create executable
-add_executable(Mr. HedgehogUI
+add_executable(MrHedgehogUI
     ${SOURCES}
     ${HEADERS}
     ${RESOURCES}
 )
 
 # Link Qt libraries
-target_link_libraries(Mr. HedgehogUI PRIVATE
+target_link_libraries(MrHedgehogUI PRIVATE
     Qt6::Core
     Qt6::Widgets
     Qt6::Gui
@@ -42,19 +42,19 @@ target_link_libraries(Mr. HedgehogUI PRIVATE
 
 # macOS specific settings
 if(APPLE)
-    set_target_properties(Mr. HedgehogUI PROPERTIES
+    set_target_properties(MrHedgehogUI PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "Mr. Hedgehog"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "com.mr_hedgehog.ui"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.mrhedgehog.app"
         MACOSX_BUNDLE_ICON_FILE "AppIcon"
     )
     
     # Copy icon
     set(APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/../assets/icon.jpg")
     if(EXISTS ${APP_ICON})
-        target_sources(Mr. HedgehogUI PRIVATE ${APP_ICON})
+        target_sources(MrHedgehogUI PRIVATE ${APP_ICON})
         set_source_files_properties(${APP_ICON} PROPERTIES
             MACOSX_PACKAGE_LOCATION "Resources")
     endif()

@@ -10,8 +10,8 @@ echo "Building project (release mode)..."
 cargo build --release
 
 # Step 3: Run the binary against test_advanced_ws
-echo "Running tracecraft analysis..."
-TARGET_BIN="target/release/tracecraft"
+echo "Running mr_hedgehog analysis..."
+TARGET_BIN="target/release/mr_hedgehog"
 
 if [ ! -f "$TARGET_BIN" ]; then
     echo "Error: Binary not found at $TARGET_BIN"

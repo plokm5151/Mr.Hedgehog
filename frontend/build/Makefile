@@ -117,98 +117,98 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named TraceCraftUI
+# Target rules for targets named MrHedgehogUI
 
 # Build rule for target.
-TraceCraftUI: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TraceCraftUI
-.PHONY : TraceCraftUI
+MrHedgehogUI: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 MrHedgehogUI
+.PHONY : MrHedgehogUI
 
 # fast build rule for target.
-TraceCraftUI/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/build
-.PHONY : TraceCraftUI/fast
+MrHedgehogUI/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/build
+.PHONY : MrHedgehogUI/fast
 
 #=============================================================================
-# Target rules for targets named TraceCraftUI_autogen_timestamp_deps
+# Target rules for targets named MrHedgehogUI_autogen_timestamp_deps
 
 # Build rule for target.
-TraceCraftUI_autogen_timestamp_deps: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TraceCraftUI_autogen_timestamp_deps
-.PHONY : TraceCraftUI_autogen_timestamp_deps
+MrHedgehogUI_autogen_timestamp_deps: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 MrHedgehogUI_autogen_timestamp_deps
+.PHONY : MrHedgehogUI_autogen_timestamp_deps
 
 # fast build rule for target.
-TraceCraftUI_autogen_timestamp_deps/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI_autogen_timestamp_deps.dir/build.make CMakeFiles/TraceCraftUI_autogen_timestamp_deps.dir/build
-.PHONY : TraceCraftUI_autogen_timestamp_deps/fast
+MrHedgehogUI_autogen_timestamp_deps/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI_autogen_timestamp_deps.dir/build.make CMakeFiles/MrHedgehogUI_autogen_timestamp_deps.dir/build
+.PHONY : MrHedgehogUI_autogen_timestamp_deps/fast
 
 #=============================================================================
-# Target rules for targets named TraceCraftUI_autogen
+# Target rules for targets named MrHedgehogUI_autogen
 
 # Build rule for target.
-TraceCraftUI_autogen: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 TraceCraftUI_autogen
-.PHONY : TraceCraftUI_autogen
+MrHedgehogUI_autogen: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 MrHedgehogUI_autogen
+.PHONY : MrHedgehogUI_autogen
 
 # fast build rule for target.
-TraceCraftUI_autogen/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI_autogen.dir/build.make CMakeFiles/TraceCraftUI_autogen.dir/build
-.PHONY : TraceCraftUI_autogen/fast
+MrHedgehogUI_autogen/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI_autogen.dir/build.make CMakeFiles/MrHedgehogUI_autogen.dir/build
+.PHONY : MrHedgehogUI_autogen/fast
 
-TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.o: TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.o
-.PHONY : TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.o
-
-# target to build an object file
-TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.o
-.PHONY : TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.o
-
-TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.i: TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.i
-.PHONY : TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.i
-
-# target to preprocess a source file
-TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.i
-.PHONY : TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.i
-
-TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.s: TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.s
-.PHONY : TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.s
-
-# target to generate assembly for a file
-TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.s
-.PHONY : TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp.s
-
-TraceCraftUI_autogen/mocs_compilation.o: TraceCraftUI_autogen/mocs_compilation.cpp.o
-.PHONY : TraceCraftUI_autogen/mocs_compilation.o
+MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.o: MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.o
+.PHONY : MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.o
 
 # target to build an object file
-TraceCraftUI_autogen/mocs_compilation.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/TraceCraftUI_autogen/mocs_compilation.cpp.o
-.PHONY : TraceCraftUI_autogen/mocs_compilation.cpp.o
+MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.o
+.PHONY : MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.o
 
-TraceCraftUI_autogen/mocs_compilation.i: TraceCraftUI_autogen/mocs_compilation.cpp.i
-.PHONY : TraceCraftUI_autogen/mocs_compilation.i
+MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.i: MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.i
+.PHONY : MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.i
 
 # target to preprocess a source file
-TraceCraftUI_autogen/mocs_compilation.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/TraceCraftUI_autogen/mocs_compilation.cpp.i
-.PHONY : TraceCraftUI_autogen/mocs_compilation.cpp.i
+MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.i
+.PHONY : MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.i
 
-TraceCraftUI_autogen/mocs_compilation.s: TraceCraftUI_autogen/mocs_compilation.cpp.s
-.PHONY : TraceCraftUI_autogen/mocs_compilation.s
+MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.s: MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.s
+.PHONY : MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.s
 
 # target to generate assembly for a file
-TraceCraftUI_autogen/mocs_compilation.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/TraceCraftUI_autogen/mocs_compilation.cpp.s
-.PHONY : TraceCraftUI_autogen/mocs_compilation.cpp.s
+MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.s
+.PHONY : MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.cpp.s
+
+MrHedgehogUI_autogen/mocs_compilation.o: MrHedgehogUI_autogen/mocs_compilation.cpp.o
+.PHONY : MrHedgehogUI_autogen/mocs_compilation.o
+
+# target to build an object file
+MrHedgehogUI_autogen/mocs_compilation.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/MrHedgehogUI_autogen/mocs_compilation.cpp.o
+.PHONY : MrHedgehogUI_autogen/mocs_compilation.cpp.o
+
+MrHedgehogUI_autogen/mocs_compilation.i: MrHedgehogUI_autogen/mocs_compilation.cpp.i
+.PHONY : MrHedgehogUI_autogen/mocs_compilation.i
+
+# target to preprocess a source file
+MrHedgehogUI_autogen/mocs_compilation.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/MrHedgehogUI_autogen/mocs_compilation.cpp.i
+.PHONY : MrHedgehogUI_autogen/mocs_compilation.cpp.i
+
+MrHedgehogUI_autogen/mocs_compilation.s: MrHedgehogUI_autogen/mocs_compilation.cpp.s
+.PHONY : MrHedgehogUI_autogen/mocs_compilation.s
+
+# target to generate assembly for a file
+MrHedgehogUI_autogen/mocs_compilation.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/MrHedgehogUI_autogen/mocs_compilation.cpp.s
+.PHONY : MrHedgehogUI_autogen/mocs_compilation.cpp.s
 
 src/graphview.o: src/graphview.cpp.o
 .PHONY : src/graphview.o
 
 # target to build an object file
 src/graphview.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/graphview.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/graphview.cpp.o
 .PHONY : src/graphview.cpp.o
 
 src/graphview.i: src/graphview.cpp.i
@@ -216,7 +216,7 @@ src/graphview.i: src/graphview.cpp.i
 
 # target to preprocess a source file
 src/graphview.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/graphview.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/graphview.cpp.i
 .PHONY : src/graphview.cpp.i
 
 src/graphview.s: src/graphview.cpp.s
@@ -224,7 +224,7 @@ src/graphview.s: src/graphview.cpp.s
 
 # target to generate assembly for a file
 src/graphview.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/graphview.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/graphview.cpp.s
 .PHONY : src/graphview.cpp.s
 
 src/main.o: src/main.cpp.o
@@ -232,7 +232,7 @@ src/main.o: src/main.cpp.o
 
 # target to build an object file
 src/main.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/main.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/main.cpp.o
 .PHONY : src/main.cpp.o
 
 src/main.i: src/main.cpp.i
@@ -240,7 +240,7 @@ src/main.i: src/main.cpp.i
 
 # target to preprocess a source file
 src/main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/main.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/main.cpp.i
 .PHONY : src/main.cpp.i
 
 src/main.s: src/main.cpp.s
@@ -248,7 +248,7 @@ src/main.s: src/main.cpp.s
 
 # target to generate assembly for a file
 src/main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/main.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/main.cpp.s
 .PHONY : src/main.cpp.s
 
 src/mainwindow.o: src/mainwindow.cpp.o
@@ -256,7 +256,7 @@ src/mainwindow.o: src/mainwindow.cpp.o
 
 # target to build an object file
 src/mainwindow.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/mainwindow.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/mainwindow.cpp.o
 .PHONY : src/mainwindow.cpp.o
 
 src/mainwindow.i: src/mainwindow.cpp.i
@@ -264,7 +264,7 @@ src/mainwindow.i: src/mainwindow.cpp.i
 
 # target to preprocess a source file
 src/mainwindow.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/mainwindow.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/mainwindow.cpp.i
 .PHONY : src/mainwindow.cpp.i
 
 src/mainwindow.s: src/mainwindow.cpp.s
@@ -272,7 +272,7 @@ src/mainwindow.s: src/mainwindow.cpp.s
 
 # target to generate assembly for a file
 src/mainwindow.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TraceCraftUI.dir/build.make CMakeFiles/TraceCraftUI.dir/src/mainwindow.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/MrHedgehogUI.dir/build.make CMakeFiles/MrHedgehogUI.dir/src/mainwindow.cpp.s
 .PHONY : src/mainwindow.cpp.s
 
 # Help Target
@@ -283,15 +283,15 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... TraceCraftUI_autogen"
-	@echo "... TraceCraftUI_autogen_timestamp_deps"
-	@echo "... TraceCraftUI"
-	@echo "... TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.o"
-	@echo "... TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.i"
-	@echo "... TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.s"
-	@echo "... TraceCraftUI_autogen/mocs_compilation.o"
-	@echo "... TraceCraftUI_autogen/mocs_compilation.i"
-	@echo "... TraceCraftUI_autogen/mocs_compilation.s"
+	@echo "... MrHedgehogUI_autogen"
+	@echo "... MrHedgehogUI_autogen_timestamp_deps"
+	@echo "... MrHedgehogUI"
+	@echo "... MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.o"
+	@echo "... MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.i"
+	@echo "... MrHedgehogUI_autogen/3YJK5W5UP7/qrc_resources.s"
+	@echo "... MrHedgehogUI_autogen/mocs_compilation.o"
+	@echo "... MrHedgehogUI_autogen/mocs_compilation.i"
+	@echo "... MrHedgehogUI_autogen/mocs_compilation.s"
 	@echo "... src/graphview.o"
 	@echo "... src/graphview.i"
 	@echo "... src/graphview.s"

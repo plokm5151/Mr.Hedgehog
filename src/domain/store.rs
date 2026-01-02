@@ -71,7 +71,7 @@ impl SymbolStore for MemorySymbolStore {
 // ============================================================================
 
 pub struct DiskSymbolStore {
-    db: Db,
+    _db: Db,
     // Trees for different data types
     functions_tree: sled::Tree,
     methods_tree: sled::Tree,
@@ -86,7 +86,7 @@ impl DiskSymbolStore {
         let lookup_tree = db.open_tree("method_lookup")?;
         
         Ok(Self {
-            db,
+            _db: db,
             functions_tree,
             methods_tree,
             lookup_tree,
