@@ -1,0 +1,4 @@
+# Hashes of file build rules.
+8748f12d878db69350d07e41d1c20a1a CMakeFiles/TraceCraftUI_autogen
+c803e293e258c932bedee9028e461dae TraceCraftUI_autogen/3YJK5W5UP7/qrc_resources.cpp
+35e8906e62962aebef9c379241033c4c TraceCraftUI_autogen/timestamp

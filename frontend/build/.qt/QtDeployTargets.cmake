@@ -1,0 +1,2 @@
+set(__QT_DEPLOY_TARGET_TraceCraftUI_FILE /Users/frank_d_chen/Downloads/Tracecraft/frontend/build/TraceCraftUI.app/Contents/MacOS/TraceCraftUI)
+set(__QT_DEPLOY_TARGET_TraceCraftUI_TYPE EXECUTABLE)
