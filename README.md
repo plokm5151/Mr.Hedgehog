@@ -101,6 +101,18 @@ scripts/              # Deployment & utility scripts
 - **Incremental caching**: Skip re-indexing unchanged files
 - **Memory-mapped I/O**: Efficient large file loading
 
+## ⚡ Engineering Highlights
+
+Mr. Hedgehog is built with a focus on performance and systems-level efficiency:
+
+- **High-Performance Core**: DFS-based path reconstruction with cycle detection and stack-based tracing.
+- **Adaptive Parallelism**: Rayon-driven work-stealing parallelism with thread pool reservation for system responsiveness.
+- **Efficient Memory management**: Memory-mapped I/O (mmap) with zero-copy Protobuf parsing (`prost`).
+- **Scalable Storage**: Fast sharded concurrent indexing (`DashMap`) and batch transactions for persistent storage (`sled`).
+- **Robust Deployment**: Automated macOS bundling and intelligent environment binary discovery.
+
+For a deep dive into the engineering details, see [TECHNICAL_DESIGN.md](./TECHNICAL_DESIGN.md).
+
 ## 📄 License
 
 MIT OR Apache-2.0
