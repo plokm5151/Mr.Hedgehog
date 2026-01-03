@@ -9,8 +9,7 @@ impl ProjectLoader {
     /// Load all source files from a Cargo workspace manifest.
     /// Returns a vector of (crate_name, file_path, file_content).
     pub fn load_workspace(manifest_path: &str, expand_macros: bool) -> Result<Vec<(String, String, String)>> {
-        // CRITICAL FIX: Prefer CARGO env var (set by cargo run) to avoid "os error 2" panics
-        let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
+        let cargo_bin = Self::find_cargo_binary();
         eprintln!("DEBUG: executing cargo metadata with binary: {} on manifest: {}", cargo_bin, manifest_path);
         
         let metadata = MetadataCommand::new()
@@ -121,5 +120,21 @@ impl ProjectLoader {
             }
         }
         Ok(())
+    }
+
+    /// Attempts to find the cargo binary in several common locations.
+    fn find_cargo_binary() -> String {
+        if let Ok(bin) = std::env::var("CARGO") { return bin; }
+        if which::which("cargo").is_ok() { return "cargo".to_string(); }
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
+        let candidates = vec![
+            format!("{}/.cargo/bin/cargo", home),
+            "/opt/homebrew/bin/cargo".to_string(),
+            "/usr/local/bin/cargo".to_string(),
+        ];
+        for candidate in candidates {
+            if Path::new(&candidate).exists() { return candidate; }
+        }
+        "cargo".to_string()
     }
 }
