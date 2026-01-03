@@ -52,7 +52,7 @@ if(APPLE)
     )
     
     # Copy icon
-    set(APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/../assets/icon.jpg")
+    set(APP_ICON "${CMAKE_CURRENT_SOURCE_DIR}/../assets/AppIcon.icns")
     if(EXISTS ${APP_ICON})
         target_sources(MrHedgehogUI PRIVATE ${APP_ICON})
         set_source_files_properties(${APP_ICON} PROPERTIES

@@ -7,3 +7,10 @@ test_project/
 test_ws/
 test_generic.rs
 *.sed
+
+# Frontend build artifacts
+frontend/build/
+
+# Generated test files
+test_advanced_ws/
+assets/test_icon.png
